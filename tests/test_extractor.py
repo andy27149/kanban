@@ -1,6 +1,6 @@
 import textwrap
 
-from extractor import load_config, extract_kpi, extract_chart
+from extractor import load_config, extract_kpi, extract_chart, extract_table
 
 
 def test_load_config_reads_all_sections(tmp_path):
@@ -190,3 +190,53 @@ def test_extract_chart_missing_header_reports_error(uploads_dir, make_workbook):
     assert result["x"] == []
     assert result["y"] == []
     assert "不存在的列" in result["error"]
+
+
+def test_extract_table_header_match_reads_selected_columns(uploads_dir, make_workbook):
+    make_workbook(
+        "销售明细.xlsx",
+        {
+            "明细": [
+                ["日期", "客户", "产品", "金额", "备注"],
+                ["2026-01-01", "客户A", "产品X", 1000, "无"],
+                ["2026-01-02", "客户B", "产品Y", 2000, "无"],
+            ]
+        },
+    )
+    item = {
+        "key": "sales_detail",
+        "title": "销售明细",
+        "source_file": "销售明细.xlsx",
+        "sheet": "明细",
+        "mode": "header_match",
+        "columns": ["日期", "客户", "产品", "金额"],
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["columns"] == ["日期", "客户", "产品", "金额"]
+    assert result["rows"] == [
+        ["2026-01-01", "客户A", "产品X", 1000],
+        ["2026-01-02", "客户B", "产品Y", 2000],
+    ]
+    assert result["error"] is None
+
+
+def test_extract_table_missing_column_reports_error(uploads_dir, make_workbook):
+    make_workbook(
+        "销售明细.xlsx",
+        {"明细": [["日期", "客户"], ["2026-01-01", "客户A"]]},
+    )
+    item = {
+        "key": "sales_detail",
+        "title": "销售明细",
+        "source_file": "销售明细.xlsx",
+        "sheet": "明细",
+        "mode": "header_match",
+        "columns": ["日期", "客户", "产品"],
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["rows"] == []
+    assert "产品" in result["error"]

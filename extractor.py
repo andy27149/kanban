@@ -105,3 +105,33 @@ def extract_chart(item, uploads_dir):
             "y": [],
             "error": str(exc),
         }
+
+
+def extract_table(item, uploads_dir):
+    key = item["key"]
+    try:
+        df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
+        columns = item["columns"]
+        missing = [c for c in columns if c not in df.columns]
+        if missing:
+            raise ValueError(f"找不到表头: '{missing[0]}'")
+        rows = [[_clean_value(v) for v in row] for row in df[columns].values.tolist()]
+        return {
+            "key": key,
+            "title": item["title"],
+            "columns": columns,
+            "rows": rows,
+            "error": None,
+            "view_group": item.get("view_group"),
+            "view_label": item.get("view_label"),
+        }
+    except ValueError as exc:
+        return {
+            "key": key,
+            "title": item.get("title"),
+            "columns": item.get("columns", []),
+            "rows": [],
+            "error": str(exc),
+            "view_group": item.get("view_group"),
+            "view_label": item.get("view_label"),
+        }
