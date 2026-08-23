@@ -32,6 +32,7 @@ async function loadDashboardData() {
     const data = await response.json();
     renderKpis(data.kpis);
     renderCharts(data.charts);
+    renderTables(data.tables);
     document.getElementById("last-sync").textContent =
       "LAST SYNC " + new Date().toLocaleString("zh-CN", { hour12: false });
   } catch (error) {
@@ -185,6 +186,104 @@ function buildChartOption(chart, chartEl) {
           },
     ],
   };
+}
+
+function renderTables(tables) {
+  const container = document.getElementById("table-section");
+  container.innerHTML = "";
+
+  const groups = [];
+  const groupIndexByKey = {};
+  tables.forEach((table) => {
+    if (table.view_group) {
+      if (!(table.view_group in groupIndexByKey)) {
+        groupIndexByKey[table.view_group] = groups.length;
+        groups.push([]);
+      }
+      groups[groupIndexByKey[table.view_group]].push(table);
+    } else {
+      groups.push([table]);
+    }
+  });
+
+  groups.forEach((group) => {
+    container.appendChild(renderTableGroup(group));
+  });
+}
+
+function renderTableGroup(group) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-card";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "table-title";
+  titleEl.textContent = group[0].title || group[0].key;
+  wrapper.appendChild(titleEl);
+
+  const body = document.createElement("div");
+
+  if (group.length > 1) {
+    const tabsEl = document.createElement("div");
+    tabsEl.className = "table-tabs";
+    group.forEach((table, index) => {
+      const tabEl = document.createElement("button");
+      tabEl.type = "button";
+      tabEl.className = "table-tab" + (index === 0 ? " active" : "");
+      tabEl.textContent = table.view_label || table.title || table.key;
+      tabEl.addEventListener("click", () => {
+        tabsEl.querySelectorAll(".table-tab").forEach((el) => el.classList.remove("active"));
+        tabEl.classList.add("active");
+        body.innerHTML = "";
+        body.appendChild(buildTableBody(table));
+      });
+      tabsEl.appendChild(tabEl);
+    });
+    wrapper.appendChild(tabsEl);
+  }
+
+  body.appendChild(buildTableBody(group[0]));
+  wrapper.appendChild(body);
+  return wrapper;
+}
+
+function buildTableBody(table) {
+  if (table.error) {
+    const errorEl = document.createElement("div");
+    errorEl.className = "table-error";
+    errorEl.textContent = `数据异常：${table.error}`;
+    return errorEl;
+  }
+
+  const scroll = document.createElement("div");
+  scroll.className = "table-scroll";
+
+  const tableEl = document.createElement("table");
+  tableEl.className = "data-table";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  table.columns.forEach((col) => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  tableEl.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  table.rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    row.forEach((cell) => {
+      const td = document.createElement("td");
+      td.textContent = cell === null || cell === undefined ? "" : cell;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  tableEl.appendChild(tbody);
+
+  scroll.appendChild(tableEl);
+  return scroll;
 }
 
 window.addEventListener("resize", () => {

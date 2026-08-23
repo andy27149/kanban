@@ -218,3 +218,16 @@ def test_dashboard_page_includes_echarts_cdn(client):
     response = client.get("/dashboard")
     html = response.data.decode("utf-8")
     assert "echarts" in html.lower()
+
+
+def test_dashboard_js_includes_table_rendering(client):
+    response = client.get("/static/js/dashboard.js")
+    body = response.data.decode("utf-8")
+    assert "renderTables" in body
+
+
+def test_dashboard_js_includes_table_view_group_tabs(client):
+    response = client.get("/static/js/dashboard.js")
+    body = response.data.decode("utf-8")
+    assert "renderTableGroup" in body
+    assert "view_group" in body
