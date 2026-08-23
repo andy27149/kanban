@@ -1,0 +1,60 @@
+kpis:
+  - key: total_revenue
+    label: "总营收"
+    source_file: "经营数据.xlsx"
+    sheet: "汇总"
+    mode: fixed_range
+    range: "B2"
+  - key: total_profit
+    label: "总利润"
+    source_file: "经营数据.xlsx"
+    sheet: "汇总"
+    mode: header_match
+    header: "利润"
+  - key: book_stock
+    label: "账面库存"
+    source_file: "库存台账.xlsx"
+    sheet: "汇总"
+    mode: fixed_range
+    range: "B2"
+  - key: actual_stock
+    label: "实际盘点库存"
+    source_file: "库存台账.xlsx"
+    sheet: "汇总"
+    mode: fixed_range
+    range: "B3"
+  - key: stock_discrepancy
+    label: "库存账实差异"
+    mode: computed
+    operation: subtract
+    from: book_stock
+    minus: actual_stock
+
+charts:
+  - key: monthly_sales_trend
+    type: line
+    title: "月度销售趋势"
+    source_file: "销售明细.xlsx"
+    sheet: "月度"
+    mode: header_match
+    x_header: "月份"
+    y_header: "销售额"
+
+tables:
+  - key: sales_detail
+    title: "销售明细"
+    source_file: "销售明细.xlsx"
+    sheet: "明细"
+    mode: header_match
+    columns: ["日期", "客户", "产品", "金额"]
+    view_group: sales_view
+    view_label: "明细"
+  - key: sales_by_customer
+    title: "按客户汇总"
+    source_file: "销售明细.xlsx"
+    sheet: "明细"
+    mode: group_by_sum
+    group_by_header: "客户"
+    sum_header: "金额"
+    view_group: sales_view
+    view_label: "按客户汇总"
