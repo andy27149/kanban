@@ -106,3 +106,39 @@ def test_extract_kpi_fixed_range_missing_sheet_reports_error(uploads_dir, make_w
 
     assert result["value"] is None
     assert "不存在的表" in result["error"]
+
+
+def test_extract_kpi_header_match_sums_numeric_column(uploads_dir, make_workbook):
+    make_workbook(
+        "经营数据.xlsx",
+        {"汇总": [["月份", "利润"], ["1月", 100], ["2月", 200], ["3月", 300]]},
+    )
+    item = {
+        "key": "total_profit",
+        "label": "总利润",
+        "source_file": "经营数据.xlsx",
+        "sheet": "汇总",
+        "mode": "header_match",
+        "header": "利润",
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result == {"key": "total_profit", "label": "总利润", "value": 600, "error": None}
+
+
+def test_extract_kpi_header_match_missing_header_reports_error(uploads_dir, make_workbook):
+    make_workbook("经营数据.xlsx", {"汇总": [["月份", "利润"], ["1月", 100]]})
+    item = {
+        "key": "total_profit",
+        "label": "总利润",
+        "source_file": "经营数据.xlsx",
+        "sheet": "汇总",
+        "mode": "header_match",
+        "header": "不存在的表头",
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["value"] is None
+    assert "不存在的表头" in result["error"]

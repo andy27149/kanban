@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import openpyxl
+import pandas as pd
 import yaml
 
 
@@ -40,6 +41,20 @@ def _read_fixed_range_values(worksheet, range_str):
     return values
 
 
+def _read_dataframe(uploads_dir, source_file, sheet_name):
+    file_path = _resolve_file(uploads_dir, source_file)
+    xls = pd.ExcelFile(file_path)
+    if sheet_name not in xls.sheet_names:
+        raise ValueError(f"找不到工作表: {sheet_name}")
+    return xls.parse(sheet_name)
+
+
+def _clean_value(v):
+    if pd.isna(v):
+        return None
+    return v
+
+
 def extract_kpi(item, uploads_dir):
     key = item["key"]
     label = item["label"]
@@ -47,6 +62,12 @@ def extract_kpi(item, uploads_dir):
         if item["mode"] == "fixed_range":
             worksheet = _load_worksheet(uploads_dir, item["source_file"], item["sheet"])
             values = _read_fixed_range_values(worksheet, item["range"])
+        elif item["mode"] == "header_match":
+            df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
+            header = item["header"]
+            if header not in df.columns:
+                raise ValueError(f"找不到表头: '{header}'")
+            values = [_clean_value(v) for v in df[header].tolist()]
         else:
             raise ValueError(f"未知的取数模式: {item['mode']}")
         numeric_values = [v for v in values if isinstance(v, (int, float))]
