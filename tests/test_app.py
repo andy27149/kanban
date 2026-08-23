@@ -164,6 +164,75 @@ def test_upload_accepts_multiple_files_in_one_request(client, tmp_path):
     assert (tmp_path / "uploads" / "销售明细.xlsx").exists()
 
 
+def test_upload_with_corrupted_excel_file_does_not_crash(client, tmp_path):
+    client.post("/login", data={"password": "test-pass"})
+
+    (tmp_path / "config.yaml").write_text(
+        "kpis:\n"
+        "  - key: total_revenue\n"
+        "    label: \"总营收\"\n"
+        "    source_file: \"损坏文件.xlsx\"\n"
+        "    sheet: \"汇总\"\n"
+        "    mode: fixed_range\n"
+        "    range: \"B2\"\n"
+        "charts: []\n"
+        "tables: []\n",
+        encoding="utf-8",
+    )
+
+    response = client.post(
+        "/upload",
+        data={"files": (io.BytesIO(b"this is not a real excel file, just garbage bytes"), "损坏文件.xlsx")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+
+    from extractor import load_data_json
+
+    data = load_data_json(tmp_path / "data.json")
+    assert data["kpis"][0]["value"] is None
+    assert data["kpis"][0]["error"]
+
+    # The pipeline must stay usable afterwards: a second, valid upload should
+    # still succeed instead of the corrupted file bricking every future /upload.
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "汇总"
+    ws.append(["指标", "数值"])
+    ws.append(["总营收", 42])
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    (tmp_path / "config.yaml").write_text(
+        "kpis:\n"
+        "  - key: total_revenue\n"
+        "    label: \"总营收\"\n"
+        "    source_file: \"经营数据.xlsx\"\n"
+        "    sheet: \"汇总\"\n"
+        "    mode: fixed_range\n"
+        "    range: \"B2\"\n"
+        "charts: []\n"
+        "tables: []\n",
+        encoding="utf-8",
+    )
+
+    response2 = client.post(
+        "/upload",
+        data={"files": (buffer, "经营数据.xlsx")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response2.status_code == 200
+    data2 = load_data_json(tmp_path / "data.json")
+    assert data2["kpis"][0]["value"] == 42
+
+
 def test_upload_rejects_path_traversal_filename(client, tmp_path):
     client.post("/login", data={"password": "test-pass"})
 

@@ -8,7 +8,7 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, ses
 from extractor import build_dashboard_data, load_config, load_data_json, save_data_json
 
 
-ALLOWED_EXTENSIONS = {".xlsx", ".xls"}
+ALLOWED_EXTENSIONS = {".xlsx"}
 
 
 def _is_safe_filename(filename):
@@ -97,7 +97,7 @@ def create_app(test_config=None):
 
             if rejected:
                 flash(
-                    "以下文件被拒绝（仅支持 .xlsx/.xls，文件名不能包含路径）：" + "；".join(rejected),
+                    "以下文件被拒绝（仅支持 .xlsx，文件名不能包含路径）：" + "；".join(rejected),
                     "error",
                 )
 
@@ -111,5 +111,7 @@ def create_app(test_config=None):
 if __name__ == "__main__":
     if os.environ.get("UPLOAD_PASSWORD") is None:
         print("警告: 未设置环境变量 UPLOAD_PASSWORD，使用默认密码 'changeme'，请在生产环境中修改。")
+    if os.environ.get("FLASK_SECRET_KEY") is None:
+        print("警告: 未设置环境变量 FLASK_SECRET_KEY，使用默认开发密钥，存在会话伪造风险，请在生产环境中修改。")
     flask_app = create_app()
     flask_app.run(host="0.0.0.0", port=5000, debug=False)

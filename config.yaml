@@ -11,6 +11,24 @@ kpis:
     sheet: "汇总"
     mode: header_match
     header: "利润"
+  - key: book_stock
+    label: "账面库存"
+    source_file: "库存台账.xlsx"
+    sheet: "汇总"
+    mode: fixed_range
+    range: "B2"
+  - key: actual_stock
+    label: "实际盘点库存"
+    source_file: "库存台账.xlsx"
+    sheet: "汇总"
+    mode: fixed_range
+    range: "B3"
+  - key: stock_discrepancy
+    label: "库存账实差异"
+    mode: computed
+    operation: subtract
+    from: book_stock
+    minus: actual_stock
 
 charts:
   - key: monthly_sales_trend
@@ -29,3 +47,14 @@ tables:
     sheet: "明细"
     mode: header_match
     columns: ["日期", "客户", "产品", "金额"]
+    view_group: sales_view
+    view_label: "明细"
+  - key: sales_by_customer
+    title: "按客户汇总"
+    source_file: "销售明细.xlsx"
+    sheet: "明细"
+    mode: group_by_sum
+    group_by_header: "客户"
+    sum_header: "金额"
+    view_group: sales_view
+    view_label: "按客户汇总"

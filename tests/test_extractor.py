@@ -385,6 +385,74 @@ def test_build_dashboard_data_resolves_computed_kpi_by_subtracting_two_kpis(uplo
     assert data["kpis"][2]["error"] is None
 
 
+def test_extract_kpi_corrupted_excel_file_reports_error_instead_of_raising(uploads_dir):
+    (uploads_dir / "损坏文件.xlsx").write_bytes(b"this is not a real excel file, just garbage bytes")
+    item = {
+        "key": "total_revenue",
+        "label": "总营收",
+        "source_file": "损坏文件.xlsx",
+        "sheet": "汇总",
+        "mode": "fixed_range",
+        "range": "B2",
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["value"] is None
+    assert result["error"]
+
+
+def test_extract_table_corrupted_excel_file_reports_error_instead_of_raising(uploads_dir):
+    (uploads_dir / "损坏文件.xlsx").write_bytes(b"this is not a real excel file, just garbage bytes")
+    item = {
+        "key": "sales_detail",
+        "title": "销售明细",
+        "source_file": "损坏文件.xlsx",
+        "sheet": "明细",
+        "mode": "header_match",
+        "columns": ["日期", "客户"],
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["rows"] == []
+    assert result["error"]
+
+
+def test_build_dashboard_data_isolates_corrupted_file_failure(uploads_dir, make_workbook):
+    (uploads_dir / "损坏文件.xlsx").write_bytes(b"this is not a real excel file, just garbage bytes")
+    make_workbook("经营数据.xlsx", {"汇总": [["指标", "数值"], ["总营收", 1000000]]})
+    config = {
+        "kpis": [
+            {
+                "key": "total_revenue",
+                "label": "总营收",
+                "source_file": "经营数据.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B2",
+            },
+            {
+                "key": "broken_kpi",
+                "label": "损坏指标",
+                "source_file": "损坏文件.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B2",
+            },
+        ],
+        "charts": [],
+        "tables": [],
+    }
+
+    data = build_dashboard_data(config, uploads_dir)
+
+    assert data["kpis"][0]["value"] == 1000000
+    assert data["kpis"][0]["error"] is None
+    assert data["kpis"][1]["value"] is None
+    assert data["kpis"][1]["error"]
+
+
 def test_build_dashboard_data_computed_kpi_reports_error_when_reference_missing(uploads_dir, make_workbook):
     make_workbook("库存表.xlsx", {"汇总": [["指标", "数值"], ["库存余额", 500]]})
     config = {

@@ -74,7 +74,7 @@ def extract_kpi(item, uploads_dir):
         numeric_values = [v for v in values if isinstance(v, (int, float))]
         value = sum(numeric_values) if numeric_values else None
         return {"key": key, "label": label, "value": value, "error": None}
-    except ValueError as exc:
+    except Exception as exc:
         return {"key": key, "label": label, "value": None, "error": str(exc)}
 
 
@@ -97,7 +97,7 @@ def extract_chart(item, uploads_dir):
             "y": y,
             "error": None,
         }
-    except ValueError as exc:
+    except Exception as exc:
         return {
             "key": key,
             "type": item.get("type"),
@@ -139,7 +139,7 @@ def extract_table(item, uploads_dir):
             "view_group": item.get("view_group"),
             "view_label": item.get("view_label"),
         }
-    except ValueError as exc:
+    except Exception as exc:
         return {
             "key": key,
             "title": item.get("title"),
