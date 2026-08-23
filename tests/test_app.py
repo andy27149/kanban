@@ -212,3 +212,9 @@ def test_static_dashboard_css_is_served(client):
 def test_static_dashboard_js_is_served(client):
     response = client.get("/static/js/dashboard.js")
     assert response.status_code == 200
+
+
+def test_dashboard_page_includes_echarts_cdn(client):
+    response = client.get("/dashboard")
+    html = response.data.decode("utf-8")
+    assert "echarts" in html.lower()
