@@ -75,3 +75,33 @@ def extract_kpi(item, uploads_dir):
         return {"key": key, "label": label, "value": value, "error": None}
     except ValueError as exc:
         return {"key": key, "label": label, "value": None, "error": str(exc)}
+
+
+def extract_chart(item, uploads_dir):
+    key = item["key"]
+    try:
+        df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
+        x_header = item["x_header"]
+        y_header = item["y_header"]
+        missing = [h for h in (x_header, y_header) if h not in df.columns]
+        if missing:
+            raise ValueError(f"找不到表头: '{missing[0]}'")
+        x = [_clean_value(v) for v in df[x_header].tolist()]
+        y = [_clean_value(v) for v in df[y_header].tolist()]
+        return {
+            "key": key,
+            "type": item["type"],
+            "title": item["title"],
+            "x": x,
+            "y": y,
+            "error": None,
+        }
+    except ValueError as exc:
+        return {
+            "key": key,
+            "type": item.get("type"),
+            "title": item.get("title"),
+            "x": [],
+            "y": [],
+            "error": str(exc),
+        }

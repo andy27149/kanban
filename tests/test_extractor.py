@@ -1,6 +1,6 @@
 import textwrap
 
-from extractor import load_config, extract_kpi
+from extractor import load_config, extract_kpi, extract_chart
 
 
 def test_load_config_reads_all_sections(tmp_path):
@@ -142,3 +142,51 @@ def test_extract_kpi_header_match_missing_header_reports_error(uploads_dir, make
 
     assert result["value"] is None
     assert "不存在的表头" in result["error"]
+
+
+def test_extract_chart_header_match_reads_x_and_y(uploads_dir, make_workbook):
+    make_workbook(
+        "销售明细.xlsx",
+        {"月度": [["月份", "销售额"], ["1月", 100], ["2月", 200]]},
+    )
+    item = {
+        "key": "monthly_sales_trend",
+        "type": "line",
+        "title": "月度销售趋势",
+        "source_file": "销售明细.xlsx",
+        "sheet": "月度",
+        "mode": "header_match",
+        "x_header": "月份",
+        "y_header": "销售额",
+    }
+
+    result = extract_chart(item, uploads_dir)
+
+    assert result == {
+        "key": "monthly_sales_trend",
+        "type": "line",
+        "title": "月度销售趋势",
+        "x": ["1月", "2月"],
+        "y": [100, 200],
+        "error": None,
+    }
+
+
+def test_extract_chart_missing_header_reports_error(uploads_dir, make_workbook):
+    make_workbook("销售明细.xlsx", {"月度": [["月份", "销售额"], ["1月", 100]]})
+    item = {
+        "key": "monthly_sales_trend",
+        "type": "line",
+        "title": "月度销售趋势",
+        "source_file": "销售明细.xlsx",
+        "sheet": "月度",
+        "mode": "header_match",
+        "x_header": "月份",
+        "y_header": "不存在的列",
+    }
+
+    result = extract_chart(item, uploads_dir)
+
+    assert result["x"] == []
+    assert result["y"] == []
+    assert "不存在的列" in result["error"]
