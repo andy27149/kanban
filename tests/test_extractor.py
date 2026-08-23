@@ -1,6 +1,6 @@
 import textwrap
 
-from extractor import load_config, extract_kpi, extract_chart, extract_table
+from extractor import load_config, extract_kpi, extract_chart, extract_table, build_dashboard_data, save_data_json, load_data_json
 
 
 def test_load_config_reads_all_sections(tmp_path):
@@ -290,3 +290,53 @@ def test_extract_table_group_by_sum_missing_header_reports_error(uploads_dir, ma
 
     assert result["rows"] == []
     assert "金额" in result["error"]
+
+
+def test_build_dashboard_data_combines_all_sections_and_isolates_failures(uploads_dir, make_workbook):
+    make_workbook("经营数据.xlsx", {"汇总": [["指标", "数值"], ["总营收", 1000000]]})
+    config = {
+        "kpis": [
+            {
+                "key": "total_revenue",
+                "label": "总营收",
+                "source_file": "经营数据.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B2",
+            },
+            {
+                "key": "missing_kpi",
+                "label": "缺失指标",
+                "source_file": "不存在.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B2",
+            },
+        ],
+        "charts": [],
+        "tables": [],
+    }
+
+    data = build_dashboard_data(config, uploads_dir)
+
+    assert data["kpis"][0]["value"] == 1000000
+    assert data["kpis"][0]["error"] is None
+    assert data["kpis"][1]["value"] is None
+    assert data["kpis"][1]["error"] is not None
+    assert data["charts"] == []
+    assert data["tables"] == []
+
+
+def test_save_and_load_data_json_roundtrip(tmp_path):
+    data = {
+        "kpis": [{"key": "k", "label": "中文标签", "value": 1, "error": None}],
+        "charts": [],
+        "tables": [],
+    }
+    data_path = tmp_path / "data.json"
+
+    save_data_json(data, data_path)
+    loaded = load_data_json(data_path)
+
+    assert loaded == data
+    assert "中文标签" in data_path.read_text(encoding="utf-8")

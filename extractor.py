@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import openpyxl
 import pandas as pd
@@ -148,3 +149,21 @@ def extract_table(item, uploads_dir):
             "view_group": item.get("view_group"),
             "view_label": item.get("view_label"),
         }
+
+
+def build_dashboard_data(config, uploads_dir):
+    return {
+        "kpis": [extract_kpi(item, uploads_dir) for item in config["kpis"]],
+        "charts": [extract_chart(item, uploads_dir) for item in config["charts"]],
+        "tables": [extract_table(item, uploads_dir) for item in config["tables"]],
+    }
+
+
+def save_data_json(data, data_path):
+    with open(data_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def load_data_json(data_path):
+    with open(data_path, "r", encoding="utf-8") as f:
+        return json.load(f)
