@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>登录 - 数据维护</title>
+</head>
+<body>
+  <h1>数据维护登录</h1>
+  {% if error %}<p style="color:red;">{{ error }}</p>{% endif %}
+  <form method="post">
+    <input type="password" name="password" placeholder="请输入密码" required>
+    <button type="submit">登录</button>
+  </form>
+</body>
+</html>

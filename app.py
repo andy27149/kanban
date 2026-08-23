@@ -1,7 +1,9 @@
 import os
+import secrets
+from functools import wraps
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 
 from extractor import load_data_json
 
@@ -32,6 +34,30 @@ def create_app(test_config=None):
         if not data_path.exists():
             return jsonify({"kpis": [], "charts": [], "tables": []})
         return jsonify(load_data_json(data_path))
+
+    def login_required(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if not session.get("logged_in"):
+                return redirect(url_for("login"))
+            return view(*args, **kwargs)
+        return wrapped
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        error = None
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            if secrets.compare_digest(password, app.config["UPLOAD_PASSWORD"]):
+                session["logged_in"] = True
+                return redirect(url_for("upload"))
+            error = "密码错误"
+        return render_template("login.html", error=error)
+
+    @app.route("/upload", methods=["GET"])
+    @login_required
+    def upload():
+        return render_template("upload.html")
 
     return app
 

@@ -51,3 +51,32 @@ def test_api_data_returns_saved_data(client, tmp_path):
     response = client.get("/api/data")
 
     assert response.get_json()["kpis"] == [{"key": "k"}]
+
+
+def test_login_page_loads(client):
+    response = client.get("/login")
+    assert response.status_code == 200
+
+
+def test_login_with_wrong_password_shows_error(client):
+    response = client.post("/login", data={"password": "wrong"})
+    assert response.status_code == 200
+    assert "密码错误".encode() in response.data
+
+
+def test_login_with_correct_password_redirects_to_upload(client):
+    response = client.post("/login", data={"password": "test-pass"})
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/upload")
+
+
+def test_upload_page_requires_login(client):
+    response = client.get("/upload")
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+
+
+def test_upload_page_accessible_after_login(client):
+    client.post("/login", data={"password": "test-pass"})
+    response = client.get("/upload")
+    assert response.status_code == 200
