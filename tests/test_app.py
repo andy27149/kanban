@@ -191,3 +191,24 @@ def test_upload_rejects_non_excel_extension(client, tmp_path):
 
     assert response.status_code == 200
     assert not (tmp_path / "uploads" / "malware.exe").exists()
+
+
+def test_dashboard_page_includes_section_containers(client):
+    response = client.get("/dashboard")
+    html = response.data.decode("utf-8")
+
+    assert 'id="kpi-section"' in html
+    assert 'id="chart-section"' in html
+    assert 'id="table-section"' in html
+    assert "dashboard.css" in html
+    assert "dashboard.js" in html
+
+
+def test_static_dashboard_css_is_served(client):
+    response = client.get("/static/css/dashboard.css")
+    assert response.status_code == 200
+
+
+def test_static_dashboard_js_is_served(client):
+    response = client.get("/static/js/dashboard.js")
+    assert response.status_code == 200

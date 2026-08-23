@@ -2,9 +2,29 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>经营看板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
-  <div id="app">看板加载中...</div>
+  <header class="dashboard-header">
+    <div>
+      <p class="header-eyebrow"><span class="pulse-dot"></span>实时同步 · 经营数据</p>
+      <h1>经营看板</h1>
+    </div>
+    <span class="updated" id="last-sync"></span>
+  </header>
+  <main id="app">
+    <p class="section-label"><span class="lead-glyph">▍</span>核心指标</p>
+    <section id="kpi-section" class="kpi-grid" aria-label="KPI 指标"></section>
+    <p class="section-label"><span class="lead-glyph">▍</span>图表</p>
+    <section id="chart-section" class="chart-grid" aria-label="图表"></section>
+    <p class="section-label"><span class="lead-glyph">▍</span>明细表格</p>
+    <section id="table-section" class="table-grid" aria-label="明细表格"></section>
+  </main>
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>
