@@ -151,9 +151,41 @@ def extract_table(item, uploads_dir):
         }
 
 
+def _resolve_computed_kpi(item, resolved_values):
+    key = item["key"]
+    label = item["label"]
+    operation = item.get("operation")
+    if operation != "subtract":
+        return {"key": key, "label": label, "value": None, "error": f"未知的运算类型: {operation}"}
+    from_key = item.get("from")
+    minus_key = item.get("minus")
+    from_value = resolved_values.get(from_key)
+    minus_value = resolved_values.get(minus_key)
+    if from_value is None or minus_value is None:
+        missing = from_key if from_value is None else minus_key
+        return {"key": key, "label": label, "value": None, "error": f"引用的指标不存在或取值失败: {missing}"}
+    return {"key": key, "label": label, "value": from_value - minus_value, "error": None}
+
+
 def build_dashboard_data(config, uploads_dir):
+    resolved_values = {}
+    raw_results = {}
+    for item in config["kpis"]:
+        if item.get("mode") != "computed":
+            result = extract_kpi(item, uploads_dir)
+            raw_results[item["key"]] = result
+            resolved_values[item["key"]] = result["value"]
+
+    kpi_results = []
+    for item in config["kpis"]:
+        if item.get("mode") == "computed":
+            result = _resolve_computed_kpi(item, resolved_values)
+        else:
+            result = raw_results[item["key"]]
+        kpi_results.append(result)
+
     return {
-        "kpis": [extract_kpi(item, uploads_dir) for item in config["kpis"]],
+        "kpis": kpi_results,
         "charts": [extract_chart(item, uploads_dir) for item in config["charts"]],
         "tables": [extract_table(item, uploads_dir) for item in config["tables"]],
     }

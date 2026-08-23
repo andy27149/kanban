@@ -340,3 +340,77 @@ def test_save_and_load_data_json_roundtrip(tmp_path):
 
     assert loaded == data
     assert "中文标签" in data_path.read_text(encoding="utf-8")
+
+
+def test_build_dashboard_data_resolves_computed_kpi_by_subtracting_two_kpis(uploads_dir, make_workbook):
+    make_workbook(
+        "库存表.xlsx",
+        {"汇总": [["指标", "数值"], ["库存余额", 500], ["港口实际库存", 320]]},
+    )
+    config = {
+        "kpis": [
+            {
+                "key": "stock_balance",
+                "label": "库存余额",
+                "source_file": "库存表.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B2",
+            },
+            {
+                "key": "port_actual_stock",
+                "label": "港口实际库存",
+                "source_file": "库存表.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B3",
+            },
+            {
+                "key": "stock_discrepancy",
+                "label": "库存账实差异",
+                "mode": "computed",
+                "operation": "subtract",
+                "from": "stock_balance",
+                "minus": "port_actual_stock",
+            },
+        ],
+        "charts": [],
+        "tables": [],
+    }
+
+    data = build_dashboard_data(config, uploads_dir)
+
+    assert [k["key"] for k in data["kpis"]] == ["stock_balance", "port_actual_stock", "stock_discrepancy"]
+    assert data["kpis"][2]["value"] == 180
+    assert data["kpis"][2]["error"] is None
+
+
+def test_build_dashboard_data_computed_kpi_reports_error_when_reference_missing(uploads_dir, make_workbook):
+    make_workbook("库存表.xlsx", {"汇总": [["指标", "数值"], ["库存余额", 500]]})
+    config = {
+        "kpis": [
+            {
+                "key": "stock_balance",
+                "label": "库存余额",
+                "source_file": "库存表.xlsx",
+                "sheet": "汇总",
+                "mode": "fixed_range",
+                "range": "B2",
+            },
+            {
+                "key": "stock_discrepancy",
+                "label": "库存账实差异",
+                "mode": "computed",
+                "operation": "subtract",
+                "from": "stock_balance",
+                "minus": "port_actual_stock",
+            },
+        ],
+        "charts": [],
+        "tables": [],
+    }
+
+    data = build_dashboard_data(config, uploads_dir)
+
+    assert data["kpis"][1]["value"] is None
+    assert "port_actual_stock" in data["kpis"][1]["error"]
