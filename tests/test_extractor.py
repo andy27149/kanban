@@ -1,6 +1,6 @@
 import textwrap
 
-from extractor import load_config
+from extractor import load_config, extract_kpi
 
 
 def test_load_config_reads_all_sections(tmp_path):
@@ -52,3 +52,57 @@ def test_load_config_defaults_missing_sections_to_empty_list(tmp_path):
     assert config["kpis"] == []
     assert config["charts"] == []
     assert config["tables"] == []
+
+
+def test_extract_kpi_fixed_range_single_cell(uploads_dir, make_workbook):
+    make_workbook("经营数据.xlsx", {"汇总": [["指标", "数值"], ["总营收", 1000000]]})
+    item = {
+        "key": "total_revenue",
+        "label": "总营收",
+        "source_file": "经营数据.xlsx",
+        "sheet": "汇总",
+        "mode": "fixed_range",
+        "range": "B2",
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result == {
+        "key": "total_revenue",
+        "label": "总营收",
+        "value": 1000000,
+        "error": None,
+    }
+
+
+def test_extract_kpi_fixed_range_missing_file_reports_error(uploads_dir, make_workbook):
+    item = {
+        "key": "total_revenue",
+        "label": "总营收",
+        "source_file": "不存在.xlsx",
+        "sheet": "汇总",
+        "mode": "fixed_range",
+        "range": "B2",
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["value"] is None
+    assert "不存在.xlsx" in result["error"]
+
+
+def test_extract_kpi_fixed_range_missing_sheet_reports_error(uploads_dir, make_workbook):
+    make_workbook("经营数据.xlsx", {"汇总": [["指标", "数值"], ["总营收", 1000000]]})
+    item = {
+        "key": "total_revenue",
+        "label": "总营收",
+        "source_file": "经营数据.xlsx",
+        "sheet": "不存在的表",
+        "mode": "fixed_range",
+        "range": "B2",
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["value"] is None
+    assert "不存在的表" in result["error"]
