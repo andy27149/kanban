@@ -50,10 +50,13 @@
 
 2. **配置映射文件 `config.yaml`**
    - 描述看板上每一个指标/图表的数据来源：对应哪个 Excel 文件、哪个 sheet、以及取数方式。
-   - 支持两种取数方式，应对"表结构是否稳定不确定"的问题：
-     - **固定范围**：直接指定单元格范围，如 `Sheet1!B2:B10`。
-     - **按表头匹配**：指定表头文字（如"销售额"），程序自动定位该列，不依赖固定列号，能容忍列顺序变化。
+   - KPI 和表格支持以下取数方式，应对"表结构是否稳定不确定"以及"部分指标需要跨指标运算/聚合"的问题：
+     - **固定范围**（`fixed_range`，仅 KPI）：直接指定单元格范围，如 `Sheet1!B2:B10`。
+     - **按表头匹配**（`header_match`，KPI/图表/表格通用）：指定表头文字（如"销售额"），程序自动定位该列，不依赖固定列号，能容忍列顺序变化。
+     - **计算型**（`computed`，仅 KPI）：不直接读 Excel，而是对已经取到的其他 KPI 值做四则运算，用于"差值/占比"这类衍生指标（如"库存账实差异 = 库存余额 − 港口实际库存"）。通过 `from`/`minus` 等字段引用其他 KPI 的 `key`；若被引用的 KPI 取数失败，计算型 KPI 也标记为取数失败并给出说明。
+     - **分组汇总**（`group_by_sum`，仅表格）：按指定表头分组（如"收货人"），对另一个数值表头求和（如"目的港称重"），并按汇总值降序排列，用于生成排名/占比类视图。
    - 新增/修改指标只需要改这个配置文件，不需要碰解析代码。
+   - **表格多视图切换**：多个 `tables` 配置项共享同一个 `view_group` 时，前端会将它们渲染成同一张卡片，通过 tab 在多个视图之间切换（例如"明细列表" / "按收货人排名"），默认展示 `view_group` 中第一个列出的视图。每个视图项用 `view_label` 作为 tab 上显示的文字。
 
    示例结构：
    ```yaml
@@ -62,7 +65,7 @@
        label: "总营收"
        source_file: "经营数据.xlsx"
        sheet: "汇总"
-       mode: fixed_range      # fixed_range | header_match
+       mode: fixed_range      # fixed_range | header_match | computed
        range: "B2"
      - key: total_profit
        label: "总利润"
@@ -70,6 +73,12 @@
        sheet: "汇总"
        mode: header_match
        header: "利润"
+     - key: stock_discrepancy
+       label: "库存账实差异"
+       mode: computed
+       operation: subtract     # 目前只支持 subtract
+       from: stock_balance     # 被引用的 KPI key（另一个 kpis 条目的 key）
+       minus: port_actual_stock
 
    charts:
      - key: monthly_sales_trend
@@ -88,17 +97,35 @@
        sheet: "明细"
        mode: header_match
        columns: ["日期", "客户", "产品", "金额"]
+     - key: outbound_list
+       title: "出库明细"
+       view_group: outbound     # 与下一项共享 view_group，前端渲染为一张卡片 + tab 切换
+       view_label: "明细列表"
+       source_file: "出库台账.xlsx"
+       sheet: "出库明细"
+       mode: header_match
+       columns: ["完货时间", "船名", "航次", "装货港称重", "目的港称重", "发货人", "收货人"]
+     - key: outbound_by_consignee
+       title: "出库明细"
+       view_group: outbound
+       view_label: "按收货人排名"
+       source_file: "出库台账.xlsx"
+       sheet: "出库明细"
+       mode: group_by_sum
+       group_by_header: "收货人"
+       sum_header: "目的港称重"
    ```
 
 3. **Excel 解析模块**（`extractor.py` 等）
    - 输入：`config.yaml` + 上传的 Excel 文件。
-   - 用 `pandas` / `openpyxl` 按配置里每一项的 `mode` 分别取数（固定范围 or 按表头匹配）。
-   - 输出：一份标准化的 `data.json`，结构与前端渲染模块一一对应（`kpis` / `charts` / `tables` 三个顶层字段，各自是取数结果的数组）。
-   - 任一项取数失败（如找不到指定表头）时，不应导致整个流程崩溃，应记录清晰的错误信息，其余项正常生成，方便维护人定位是哪个 Excel 出了问题。
+   - 用 `pandas` / `openpyxl` 按配置里每一项的 `mode` 分别取数（固定范围 / 按表头匹配 / 分组汇总）；KPI 的 `computed` 模式不读 Excel，而是在其余 KPI 都取数完成后，按 `key` 引用已取到的值做运算。
+   - 输出：一份标准化的 `data.json`，结构与前端渲染模块一一对应（`kpis` / `charts` / `tables` 三个顶层字段，各自是取数结果的数组）；共享同一 `view_group` 的多个表格条目各自作为独立的数组元素输出，前端负责按 `view_group` 归并展示。
+   - 任一项取数失败（如找不到指定表头、`computed` 引用的 KPI 不存在）时，不应导致整个流程崩溃，应记录清晰的错误信息，其余项正常生成，方便维护人定位是哪个 Excel 出了问题。
 
 4. **看板前端页面**（静态 HTML + JS + CSS）
    - 图表库使用 **ECharts**（对中文标签支持好，覆盖折线图/柱状图/饼图等常见图表类型）。
-   - 页面加载时请求 `/api/data`，拿到 JSON 后依次渲染：KPI 卡片区、趋势图表区、占比/排名图表区、明细表格区（表格支持基本的排序）。
+   - 页面加载时请求 `/api/data`，拿到 JSON 后依次渲染：KPI 卡片区、趋势图表区、占比/排名图表区、明细表格区（表格支持基本的排序）。关键的衍生型 KPI（如库存账实差异）与其他 KPI 一样出现在首屏 KPI 卡片区，不需要额外的独立区域。
+   - 表格区渲染时按 `view_group` 归并：同组的多个表格条目合并为一张卡片，卡片内用 tab 控件在各视图间切换，默认显示 `view_group` 中第一个条目对应的视图；没有 `view_group` 的表格条目照常各自单独渲染一张卡片。
    - 页面本身不做特殊登录态处理（只读、无密码）。
    - 视觉与多端适配要求见下方独立章节。
 
