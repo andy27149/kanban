@@ -240,3 +240,53 @@ def test_extract_table_missing_column_reports_error(uploads_dir, make_workbook):
 
     assert result["rows"] == []
     assert "产品" in result["error"]
+
+
+def test_extract_table_group_by_sum_ranks_descending(uploads_dir, make_workbook):
+    make_workbook(
+        "销售明细.xlsx",
+        {
+            "明细": [
+                ["日期", "客户", "产品", "金额"],
+                ["2026-01-01", "客户A", "产品X", 1000],
+                ["2026-01-02", "客户B", "产品Y", 2000],
+                ["2026-01-03", "客户A", "产品Z", 500],
+            ]
+        },
+    )
+    item = {
+        "key": "sales_by_customer",
+        "title": "客户销售排名",
+        "source_file": "销售明细.xlsx",
+        "sheet": "明细",
+        "mode": "group_by_sum",
+        "group_by_header": "客户",
+        "sum_header": "金额",
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["columns"] == ["客户", "金额"]
+    assert result["rows"] == [["客户B", 2000], ["客户A", 1500]]
+    assert result["error"] is None
+
+
+def test_extract_table_group_by_sum_missing_header_reports_error(uploads_dir, make_workbook):
+    make_workbook(
+        "销售明细.xlsx",
+        {"明细": [["日期", "客户"], ["2026-01-01", "客户A"]]},
+    )
+    item = {
+        "key": "sales_by_customer",
+        "title": "客户销售排名",
+        "source_file": "销售明细.xlsx",
+        "sheet": "明细",
+        "mode": "group_by_sum",
+        "group_by_header": "客户",
+        "sum_header": "金额",
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["rows"] == []
+    assert "金额" in result["error"]

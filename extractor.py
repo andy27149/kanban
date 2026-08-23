@@ -111,11 +111,24 @@ def extract_table(item, uploads_dir):
     key = item["key"]
     try:
         df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
-        columns = item["columns"]
-        missing = [c for c in columns if c not in df.columns]
-        if missing:
-            raise ValueError(f"找不到表头: '{missing[0]}'")
-        rows = [[_clean_value(v) for v in row] for row in df[columns].values.tolist()]
+        mode = item["mode"]
+        if mode == "header_match":
+            columns = item["columns"]
+            missing = [c for c in columns if c not in df.columns]
+            if missing:
+                raise ValueError(f"找不到表头: '{missing[0]}'")
+            rows = [[_clean_value(v) for v in row] for row in df[columns].values.tolist()]
+        elif mode == "group_by_sum":
+            group_by_header = item["group_by_header"]
+            sum_header = item["sum_header"]
+            missing = [h for h in (group_by_header, sum_header) if h not in df.columns]
+            if missing:
+                raise ValueError(f"找不到表头: '{missing[0]}'")
+            grouped = df.groupby(group_by_header)[sum_header].sum().sort_values(ascending=False)
+            columns = [group_by_header, sum_header]
+            rows = [[_clean_value(k), _clean_value(v)] for k, v in grouped.items()]
+        else:
+            raise ValueError(f"未知的取数模式: {mode}")
         return {
             "key": key,
             "title": item["title"],
