@@ -5,7 +5,18 @@ from pathlib import Path
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 
-from extractor import load_data_json
+from extractor import build_dashboard_data, load_config, load_data_json, save_data_json
+
+
+ALLOWED_EXTENSIONS = {".xlsx", ".xls"}
+
+
+def _is_safe_filename(filename):
+    if not filename:
+        return False
+    if os.path.basename(filename) != filename:
+        return False
+    return Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
 
 def create_app(test_config=None):
@@ -54,9 +65,44 @@ def create_app(test_config=None):
             error = "密码错误"
         return render_template("login.html", error=error)
 
-    @app.route("/upload", methods=["GET"])
+    @app.route("/upload", methods=["GET", "POST"])
     @login_required
     def upload():
+        if request.method == "POST":
+            upload_dir = Path(app.config["UPLOAD_DIR"])
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
+            saved, rejected = [], []
+            for file in request.files.getlist("files"):
+                filename = file.filename
+                if not _is_safe_filename(filename):
+                    rejected.append(filename or "(空文件名)")
+                    continue
+                file.save(upload_dir / filename)
+                saved.append(filename)
+
+            if saved:
+                config = load_config(app.config["CONFIG_PATH"])
+                data = build_dashboard_data(config, upload_dir)
+                save_data_json(data, app.config["DATA_PATH"])
+                errors = [
+                    item["error"]
+                    for item in data["kpis"] + data["charts"] + data["tables"]
+                    if item["error"]
+                ]
+                if errors:
+                    flash(f"已保存 {len(saved)} 个文件，但部分指标解析失败：" + "；".join(errors), "warning")
+                else:
+                    flash(f"已成功保存并解析 {len(saved)} 个文件", "success")
+
+            if rejected:
+                flash(
+                    "以下文件被拒绝（仅支持 .xlsx/.xls，文件名不能包含路径）：" + "；".join(rejected),
+                    "error",
+                )
+
+            return redirect(url_for("upload"))
+
         return render_template("upload.html")
 
     return app
