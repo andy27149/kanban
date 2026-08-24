@@ -1,60 +1,121 @@
 kpis:
-  - key: total_revenue
-    label: "总营收"
-    source_file: "经营数据.xlsx"
-    sheet: "汇总"
+  - key: total_inbound
+    label: "入库总量（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
     mode: fixed_range
-    range: "B2"
-  - key: total_profit
-    label: "总利润"
-    source_file: "经营数据.xlsx"
-    sheet: "汇总"
-    mode: header_match
-    header: "利润"
-  - key: book_stock
-    label: "账面库存"
-    source_file: "库存台账.xlsx"
-    sheet: "汇总"
+    range: "E17"
+  - key: total_outbound
+    label: "出库总量（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
     mode: fixed_range
-    range: "B2"
-  - key: actual_stock
-    label: "实际盘点库存"
-    source_file: "库存台账.xlsx"
-    sheet: "汇总"
+    range: "I17"
+  - key: inventory_balance
+    label: "库存余额合计（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
     mode: fixed_range
-    range: "B3"
-  - key: stock_discrepancy
-    label: "库存账实差异"
-    mode: computed
-    operation: subtract
-    from: book_stock
-    minus: actual_stock
+    range: "K17"
+  - key: actual_port_stock
+    label: "锦州港实际库存合计（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
+    mode: fixed_range
+    range: "L17"
+  - key: transfer_loss
+    label: "倒运亏合计（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
+    mode: fixed_range
+    range: "J17"
 
 charts:
-  - key: monthly_sales_trend
+  - key: category_in_out
+    type: bar
+    title: "按品类对比入库/出库（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
+    mode: fixed_range
+    x_range: "B6:B16"
+    series:
+      - name: "入库合计"
+        range: "E6:E16"
+      - name: "出库合计"
+        range: "I6:I16"
+  - key: inventory_balance_by_category
+    type: bar
+    title: "库存余额分布（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
+    mode: fixed_range
+    x_range: "B6:B16"
+    y_range: "K6:K16"
+  - key: outbound_volume_trend
     type: line
-    title: "月度销售趋势"
-    source_file: "销售明细.xlsx"
-    sheet: "月度"
-    mode: header_match
-    x_header: "月份"
-    y_header: "销售额"
+    title: "出库船次装货量趋势（吨）"
+    source_file: "基础表.xlsx"
+    sheet: "出库明细"
+    mode: fixed_range
+    x_range: "B8:B22"
+    y_range: "G8:G22"
 
 tables:
-  - key: sales_detail
-    title: "销售明细"
-    source_file: "销售明细.xlsx"
-    sheet: "明细"
-    mode: header_match
-    columns: ["日期", "客户", "产品", "金额"]
-    view_group: sales_view
-    view_label: "明细"
-  - key: sales_by_customer
-    title: "按客户汇总"
-    source_file: "销售明细.xlsx"
-    sheet: "明细"
-    mode: group_by_sum
-    group_by_header: "客户"
-    sum_header: "金额"
-    view_group: sales_view
-    view_label: "按客户汇总"
+  - key: category_summary
+    title: "品类汇总表"
+    source_file: "基础表.xlsx"
+    sheet: "合计"
+    mode: fixed_range
+    columns:
+      - label: "品类"
+        range: "B6:B16"
+      - label: "入库合计（吨）"
+        range: "E6:E16"
+      - label: "出库合计（吨）"
+        range: "I6:I16"
+      - label: "倒运亏（吨）"
+        range: "J6:J16"
+      - label: "库存余额（吨）"
+        range: "K6:K16"
+      - label: "锦州港实际库存（吨）"
+        range: "L6:L16"
+    view_group: outbound_view
+    view_label: "品类汇总"
+  - key: outbound_detail
+    title: "出库明细"
+    source_file: "基础表.xlsx"
+    sheet: "出库明细"
+    mode: fixed_range
+    columns:
+      - label: "完货时间"
+        range: "B8:B22"
+      - label: "船名"
+        range: "C8:C22"
+      - label: "航次"
+        range: "D8:D22"
+      - label: "装货港"
+        range: "F8:F22"
+      - label: "装货港称重（吨）"
+        range: "G8:G22"
+      - label: "目的港"
+        range: "AD8:AD22"
+      - label: "目的港称重（吨）"
+        range: "AE8:AE22"
+      - label: "发货人"
+        range: "AK8:AK22"
+      - label: "收货人"
+        range: "AL8:AL22"
+    view_group: outbound_view
+    view_label: "出库明细"
+  - key: outbound_by_region
+    title: "出库按矿区汇总"
+    source_file: "基础表.xlsx"
+    sheet: "出库明细"
+    mode: fixed_range
+    columns:
+      - label: "矿区"
+        range: "B28:B37"
+      - label: "出库数量（吨）"
+        range: "D28:D37"
+    view_group: outbound_view
+    view_label: "按矿区汇总"

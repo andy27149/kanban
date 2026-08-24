@@ -1,4 +1,5 @@
 from pathlib import Path
+import datetime
 import json
 
 import openpyxl
@@ -56,6 +57,18 @@ def _clean_value(v):
     return v
 
 
+def _clean_cell_value(v):
+    if v is None:
+        return None
+    if isinstance(v, (datetime.datetime, datetime.date)):
+        return v.strftime("%Y-%m-%d")
+    return v
+
+
+def _read_fixed_range_column(worksheet, range_str):
+    return [_clean_cell_value(v) for v in _read_fixed_range_values(worksheet, range_str)]
+
+
 def extract_kpi(item, uploads_dir):
     key = item["key"]
     label = item["label"]
@@ -81,22 +94,44 @@ def extract_kpi(item, uploads_dir):
 def extract_chart(item, uploads_dir):
     key = item["key"]
     try:
-        df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
-        x_header = item["x_header"]
-        y_header = item["y_header"]
-        missing = [h for h in (x_header, y_header) if h not in df.columns]
-        if missing:
-            raise ValueError(f"找不到表头: '{missing[0]}'")
-        x = [_clean_value(v) for v in df[x_header].tolist()]
-        y = [_clean_value(v) for v in df[y_header].tolist()]
-        return {
-            "key": key,
-            "type": item["type"],
-            "title": item["title"],
-            "x": x,
-            "y": y,
-            "error": None,
-        }
+        mode = item.get("mode", "header_match")
+        if mode == "fixed_range":
+            worksheet = _load_worksheet(uploads_dir, item["source_file"], item["sheet"])
+            x = _read_fixed_range_column(worksheet, item["x_range"])
+            result = {
+                "key": key,
+                "type": item["type"],
+                "title": item["title"],
+                "x": x,
+                "error": None,
+            }
+            if "series" in item:
+                result["series"] = [
+                    {"name": s["name"], "data": _read_fixed_range_column(worksheet, s["range"])}
+                    for s in item["series"]
+                ]
+            else:
+                result["y"] = _read_fixed_range_column(worksheet, item["y_range"])
+            return result
+        elif mode == "header_match":
+            df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
+            x_header = item["x_header"]
+            y_header = item["y_header"]
+            missing = [h for h in (x_header, y_header) if h not in df.columns]
+            if missing:
+                raise ValueError(f"找不到表头: '{missing[0]}'")
+            x = [_clean_value(v) for v in df[x_header].tolist()]
+            y = [_clean_value(v) for v in df[y_header].tolist()]
+            return {
+                "key": key,
+                "type": item["type"],
+                "title": item["title"],
+                "x": x,
+                "y": y,
+                "error": None,
+            }
+        else:
+            raise ValueError(f"未知的取数模式: {mode}")
     except Exception as exc:
         return {
             "key": key,
@@ -111,8 +146,22 @@ def extract_chart(item, uploads_dir):
 def extract_table(item, uploads_dir):
     key = item["key"]
     try:
-        df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
         mode = item["mode"]
+        if mode == "fixed_range":
+            worksheet = _load_worksheet(uploads_dir, item["source_file"], item["sheet"])
+            columns = [c["label"] for c in item["columns"]]
+            column_values = [_read_fixed_range_column(worksheet, c["range"]) for c in item["columns"]]
+            rows = [list(row) for row in zip(*column_values)]
+            return {
+                "key": key,
+                "title": item["title"],
+                "columns": columns,
+                "rows": rows,
+                "error": None,
+                "view_group": item.get("view_group"),
+                "view_label": item.get("view_label"),
+            }
+        df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
         if mode == "header_match":
             columns = item["columns"]
             missing = [c for c in columns if c not in df.columns]
@@ -140,10 +189,12 @@ def extract_table(item, uploads_dir):
             "view_label": item.get("view_label"),
         }
     except Exception as exc:
+        raw_columns = item.get("columns", [])
+        columns = [c["label"] if isinstance(c, dict) else c for c in raw_columns]
         return {
             "key": key,
             "title": item.get("title"),
-            "columns": item.get("columns", []),
+            "columns": columns,
             "rows": [],
             "error": str(exc),
             "view_group": item.get("view_group"),

@@ -134,12 +134,63 @@ function buildChartOption(chart, chartEl) {
   }
 
   const isBar = chart.type === "bar";
-  const rotate = chartEl && chartEl.clientWidth < 340 ? 28 : 0;
+  const pxPerLabel = chartEl && chart.x.length ? chartEl.clientWidth / chart.x.length : Infinity;
+  const rotate = pxPerLabel < 60 ? 45 : pxPerLabel < 80 ? 28 : 0;
+  const seriesColors = [p.goldDeep, '#5b6b7a', '#8c3a2e', p.goldLight];
+
+  const series = chart.series
+    ? chart.series.map((s, i) => ({
+        name: s.name,
+        type: "bar",
+        data: s.data,
+        barGap: "20%",
+        itemStyle: {
+          borderRadius: [4, 4, 0, 0],
+          color: seriesColors[i % seriesColors.length],
+        },
+      }))
+    : [
+        isBar
+          ? {
+              type: "bar",
+              data: chart.y,
+              barWidth: "46%",
+              itemStyle: {
+                borderRadius: [4, 4, 0, 0],
+                color: {
+                  type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+                  colorStops: [
+                    { offset: 0, color: p.goldDeep },
+                    { offset: 1, color: "rgba(122, 92, 28, 0.35)" },
+                  ],
+                },
+              },
+            }
+          : {
+              type: "line",
+              data: chart.y,
+              smooth: true,
+              lineStyle: { color: p.gold, width: 2.5 },
+              itemStyle: { color: p.gold },
+              areaStyle: {
+                color: {
+                  type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+                  colorStops: [
+                    { offset: 0, color: "rgba(156, 122, 37, 0.28)" },
+                    { offset: 1, color: "rgba(156, 122, 37, 0)" },
+                  ],
+                },
+              },
+            },
+      ];
 
   return {
     textStyle: { color: p.text, fontFamily: 'Inter, sans-serif' },
-    grid: { left: 44, right: 16, top: 20, bottom: 28 },
+    grid: { left: 44, right: 16, top: chart.series ? 36 : 20, bottom: rotate > 0 ? 48 : 28 },
     tooltip: { trigger: "axis" },
+    legend: chart.series
+      ? { top: 0, textStyle: { color: p.muted, fontSize: 12 } }
+      : undefined,
     xAxis: {
       type: "category",
       data: chart.x,
@@ -151,40 +202,7 @@ function buildChartOption(chart, chartEl) {
       splitLine: { lineStyle: { color: p.line } },
       axisLabel: { color: p.muted, formatter: kFormat },
     },
-    series: [
-      isBar
-        ? {
-            type: "bar",
-            data: chart.y,
-            barWidth: "46%",
-            itemStyle: {
-              borderRadius: [4, 4, 0, 0],
-              color: {
-                type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-                colorStops: [
-                  { offset: 0, color: p.goldDeep },
-                  { offset: 1, color: "rgba(122, 92, 28, 0.35)" },
-                ],
-              },
-            },
-          }
-        : {
-            type: "line",
-            data: chart.y,
-            smooth: true,
-            lineStyle: { color: p.gold, width: 2.5 },
-            itemStyle: { color: p.gold },
-            areaStyle: {
-              color: {
-                type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-                colorStops: [
-                  { offset: 0, color: "rgba(156, 122, 37, 0.28)" },
-                  { offset: 1, color: "rgba(156, 122, 37, 0)" },
-                ],
-              },
-            },
-          },
-    ],
+    series,
   };
 }
 

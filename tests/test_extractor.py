@@ -453,6 +453,178 @@ def test_build_dashboard_data_isolates_corrupted_file_failure(uploads_dir, make_
     assert data["kpis"][1]["error"]
 
 
+def test_extract_chart_fixed_range_single_series(uploads_dir, make_workbook):
+    make_workbook(
+        "基础表.xlsx",
+        {
+            "合计": [
+                ["序号", "品类"],
+                [1, "C", 100],
+                [2, "B", 200],
+            ]
+        },
+    )
+    item = {
+        "key": "inventory_by_category",
+        "type": "bar",
+        "title": "库存余额分布",
+        "source_file": "基础表.xlsx",
+        "sheet": "合计",
+        "mode": "fixed_range",
+        "x_range": "B2:B3",
+        "y_range": "C2:C3",
+    }
+
+    result = extract_chart(item, uploads_dir)
+
+    assert result == {
+        "key": "inventory_by_category",
+        "type": "bar",
+        "title": "库存余额分布",
+        "x": ["C", "B"],
+        "y": [100, 200],
+        "error": None,
+    }
+
+
+def test_extract_chart_fixed_range_multi_series(uploads_dir, make_workbook):
+    make_workbook(
+        "基础表.xlsx",
+        {
+            "合计": [
+                ["序号", "品类"],
+                [1, "C", 100, 90],
+                [2, "B", 200, 180],
+            ]
+        },
+    )
+    item = {
+        "key": "category_in_out",
+        "type": "bar",
+        "title": "按品类对比入库/出库",
+        "source_file": "基础表.xlsx",
+        "sheet": "合计",
+        "mode": "fixed_range",
+        "x_range": "B2:B3",
+        "series": [
+            {"name": "入库合计", "range": "C2:C3"},
+            {"name": "出库合计", "range": "D2:D3"},
+        ],
+    }
+
+    result = extract_chart(item, uploads_dir)
+
+    assert result["x"] == ["C", "B"]
+    assert result["series"] == [
+        {"name": "入库合计", "data": [100, 200]},
+        {"name": "出库合计", "data": [90, 180]},
+    ]
+    assert result["error"] is None
+    assert "y" not in result
+
+
+def test_extract_chart_fixed_range_bad_range_reports_error(uploads_dir, make_workbook):
+    make_workbook("基础表.xlsx", {"合计": [["品类"], ["C"]]})
+    item = {
+        "key": "broken_chart",
+        "type": "bar",
+        "title": "坏图表",
+        "source_file": "基础表.xlsx",
+        "sheet": "合计",
+        "mode": "fixed_range",
+        "x_range": "not-a-range",
+        "y_range": "A1:A2",
+    }
+
+    result = extract_chart(item, uploads_dir)
+
+    assert result["x"] == []
+    assert result["error"]
+
+
+def test_extract_table_fixed_range_reads_labeled_columns(uploads_dir, make_workbook):
+    make_workbook(
+        "基础表.xlsx",
+        {
+            "合计": [
+                ["序号"],
+                [1, "C", 100, 90],
+                [2, "B", 200, 180],
+            ]
+        },
+    )
+    item = {
+        "key": "category_summary",
+        "title": "品类汇总表",
+        "source_file": "基础表.xlsx",
+        "sheet": "合计",
+        "mode": "fixed_range",
+        "columns": [
+            {"label": "品类", "range": "B2:B3"},
+            {"label": "入库合计（吨）", "range": "C2:C3"},
+            {"label": "出库合计（吨）", "range": "D2:D3"},
+        ],
+        "view_group": "category_view",
+        "view_label": "品类汇总",
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["columns"] == ["品类", "入库合计（吨）", "出库合计（吨）"]
+    assert result["rows"] == [["C", 100, 90], ["B", 200, 180]]
+    assert result["error"] is None
+    assert result["view_group"] == "category_view"
+    assert result["view_label"] == "品类汇总"
+
+
+def test_extract_table_fixed_range_converts_dates_to_strings(uploads_dir, make_workbook):
+    import datetime
+
+    make_workbook(
+        "基础表.xlsx",
+        {
+            "出库明细": [
+                ["序号"],
+                [1, datetime.datetime(2026, 6, 22), "XY"],
+            ]
+        },
+    )
+    item = {
+        "key": "outbound_detail",
+        "title": "出库明细",
+        "source_file": "基础表.xlsx",
+        "sheet": "出库明细",
+        "mode": "fixed_range",
+        "columns": [
+            {"label": "完货时间", "range": "B2:B2"},
+            {"label": "船名", "range": "C2:C2"},
+        ],
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["rows"] == [["2026-06-22", "XY"]]
+    assert result["error"] is None
+
+
+def test_extract_table_fixed_range_bad_range_reports_error_with_string_columns(uploads_dir, make_workbook):
+    make_workbook("基础表.xlsx", {"合计": [["品类"], ["C"]]})
+    item = {
+        "key": "broken_table",
+        "title": "坏表格",
+        "source_file": "基础表.xlsx",
+        "sheet": "合计",
+        "mode": "fixed_range",
+        "columns": [{"label": "品类", "range": "not-a-range"}],
+    }
+
+    result = extract_table(item, uploads_dir)
+
+    assert result["columns"] == ["品类"]
+    assert result["rows"] == []
+    assert result["error"]
+
+
 def test_build_dashboard_data_computed_kpi_reports_error_when_reference_missing(uploads_dir, make_workbook):
     make_workbook("库存表.xlsx", {"汇总": [["指标", "数值"], ["库存余额", 500]]})
     config = {
