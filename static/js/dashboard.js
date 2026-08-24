@@ -25,11 +25,16 @@ function kFormat(v) {
 
 async function loadDashboardData() {
   try {
-    const response = await fetch("/api/data");
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    let data;
+    if (window.__DASHBOARD_DATA__) {
+      data = window.__DASHBOARD_DATA__;
+    } else {
+      const response = await fetch("/api/data");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      data = await response.json();
     }
-    const data = await response.json();
     renderKpis(data.kpis);
     renderCharts(data.charts);
     renderTables(data.tables);
