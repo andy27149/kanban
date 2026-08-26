@@ -105,6 +105,15 @@ function renderCharts(charts) {
       return;
     }
 
+    if (chart.hint) {
+      const hintEl = document.createElement("div");
+      hintEl.className = "chart-hint";
+      hintEl.textContent = chart.hint;
+      wrapper.appendChild(hintEl);
+      container.appendChild(wrapper);
+      return;
+    }
+
     const chartEl = document.createElement("div");
     chartEl.className = "chart-canvas";
     chartEl.id = `chart-${chart.key}`;
@@ -351,6 +360,51 @@ function renderTableGroup(group) {
   return wrapper;
 }
 
+function buildDataRow(table, row, rowIndex) {
+  const tr = document.createElement("tr");
+
+  const rowExtra = table.key === "outbound_detail" && Array.isArray(table.row_extra)
+    ? table.row_extra[rowIndex] || []
+    : null;
+  if (rowExtra && rowExtra.length > 0) {
+    tr.classList.add("row-clickable");
+    tr.addEventListener("click", () => {
+      openModal(
+        "配煤品类明细",
+        buildSimpleTable(["品类/指标", "数值（吨）"], rowExtra.map((e) => [e.label, e.value]))
+      );
+    });
+  }
+
+  row.forEach((cell, colIndex) => {
+    const td = document.createElement("td");
+    td.textContent = formatCell(cell);
+
+    const isRegionCell = table.key === "category_summary" && colIndex === 0;
+    const sources = isRegionCell && dashboardData && dashboardData.category_sources
+      ? dashboardData.category_sources[cell]
+      : null;
+    if (sources) {
+      td.classList.add("cell-clickable");
+      td.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const wrap = document.createElement("div");
+        sources.forEach((segment) => {
+          const heading = document.createElement("div");
+          heading.className = "modal-subtitle";
+          heading.textContent = segment.sheet;
+          wrap.appendChild(heading);
+          wrap.appendChild(buildSimpleTable(segment.headers, segment.rows));
+        });
+        openModal(`矿区明细：${cell}`, wrap);
+      });
+    }
+
+    tr.appendChild(td);
+  });
+  return tr;
+}
+
 function buildTableBody(table) {
   if (table.error) {
     const errorEl = document.createElement("div");
@@ -359,71 +413,97 @@ function buildTableBody(table) {
     return errorEl;
   }
 
+  const wrapper = document.createElement("div");
+
+  const statusIndex = table.status_column ? table.columns.indexOf(table.status_column) : -1;
   const scroll = document.createElement("div");
   scroll.className = "table-scroll";
 
-  const tableEl = document.createElement("table");
-  tableEl.className = "data-table";
+  function renderRows(activeStatus) {
+    scroll.innerHTML = "";
 
-  const thead = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  table.columns.forEach((col) => {
-    const th = document.createElement("th");
-    th.textContent = col;
-    headRow.appendChild(th);
-  });
-  thead.appendChild(headRow);
-  tableEl.appendChild(thead);
+    const tableEl = document.createElement("table");
+    tableEl.className = "data-table";
 
-  const tbody = document.createElement("tbody");
-  table.rows.forEach((row, rowIndex) => {
-    const tr = document.createElement("tr");
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    table.columns.forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    tableEl.appendChild(thead);
 
-    const rowExtra = table.key === "outbound_detail" && Array.isArray(table.row_extra)
-      ? table.row_extra[rowIndex] || []
-      : null;
-    if (rowExtra && rowExtra.length > 0) {
-      tr.classList.add("row-clickable");
-      tr.addEventListener("click", () => {
-        openModal(
-          "配煤品类明细",
-          buildSimpleTable(["品类/指标", "数值（吨）"], rowExtra.map((e) => [e.label, e.value]))
-        );
+    const tbody = document.createElement("tbody");
+    table.rows.forEach((row, rowIndex) => {
+      if (activeStatus !== null && row[statusIndex] !== activeStatus) return;
+      tbody.appendChild(buildDataRow(table, row, rowIndex));
+    });
+
+    if (table.totals) {
+      const totalsRow = document.createElement("tr");
+      totalsRow.className = "totals-row";
+      table.totals.forEach((cell) => {
+        const td = document.createElement("td");
+        td.textContent = formatCell(cell);
+        totalsRow.appendChild(td);
       });
+      tbody.appendChild(totalsRow);
     }
 
-    row.forEach((cell, colIndex) => {
-      const td = document.createElement("td");
-      td.textContent = formatCell(cell);
+    tableEl.appendChild(tbody);
+    scroll.appendChild(tableEl);
+  }
 
-      const isRegionCell = table.key === "category_summary" && colIndex === 0;
-      const sources = isRegionCell && dashboardData && dashboardData.category_sources
-        ? dashboardData.category_sources[cell]
-        : null;
-      if (sources) {
-        td.classList.add("cell-clickable");
-        td.addEventListener("click", (event) => {
-          event.stopPropagation();
-          const wrap = document.createElement("div");
-          sources.forEach((segment) => {
-            const heading = document.createElement("div");
-            heading.className = "modal-subtitle";
-            heading.textContent = segment.sheet;
-            wrap.appendChild(heading);
-            wrap.appendChild(buildSimpleTable(segment.headers, segment.rows));
-          });
-          openModal(`矿区明细：${cell}`, wrap);
-        });
-      }
-
-      tr.appendChild(td);
+  if (statusIndex !== -1) {
+    const counts = {};
+    table.rows.forEach((row) => {
+      const value = row[statusIndex];
+      if (value === null || value === undefined || value === "") return;
+      counts[value] = (counts[value] || 0) + 1;
     });
-    tbody.appendChild(tr);
-  });
-  tableEl.appendChild(tbody);
 
-  scroll.appendChild(tableEl);
-  return scroll;
+    let activeStatus = null;
+    const badgesEl = document.createElement("div");
+    badgesEl.className = "status-badges";
+
+    const allBadge = document.createElement("button");
+    allBadge.type = "button";
+    allBadge.className = "status-badge active";
+    allBadge.textContent = `全部（${table.rows.length}）`;
+    allBadge.addEventListener("click", () => {
+      activeStatus = null;
+      badgesEl.querySelectorAll(".status-badge").forEach((el) => el.classList.remove("active"));
+      allBadge.classList.add("active");
+      renderRows(activeStatus);
+    });
+    badgesEl.appendChild(allBadge);
+
+    Object.keys(counts).forEach((status) => {
+      const badge = document.createElement("button");
+      badge.type = "button";
+      badge.className = "status-badge";
+      badge.textContent = `${status}（${counts[status]}）`;
+      badge.addEventListener("click", () => {
+        activeStatus = activeStatus === status ? null : status;
+        badgesEl.querySelectorAll(".status-badge").forEach((el) => el.classList.remove("active"));
+        if (activeStatus === status) {
+          badge.classList.add("active");
+        } else {
+          allBadge.classList.add("active");
+        }
+        renderRows(activeStatus);
+      });
+      badgesEl.appendChild(badge);
+    });
+
+    wrapper.appendChild(badgesEl);
+  }
+
+  wrapper.appendChild(scroll);
+  renderRows(null);
+  return wrapper;
 }
 
 window.addEventListener("resize", () => {

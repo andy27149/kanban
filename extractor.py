@@ -106,6 +106,46 @@ def _group_by_month(x_values, y_values):
     return months, [sums[m] for m in months]
 
 
+def _read_sheet_rows(uploads_dir, source_file, sheet_name, header_row, id_column):
+    """按行读取整张 sheet（不依赖 pandas，允许重复列名）。
+    header_row 之上的行（如标题行）被忽略；id_column 所在列为空的行自动跳过。
+    """
+    worksheet = _load_worksheet(uploads_dir, source_file, sheet_name)
+    header_cells = next(worksheet.iter_rows(min_row=header_row, max_row=header_row))
+    columns = [_clean_cell_value(cell.value) for cell in header_cells]
+    try:
+        id_index = columns.index(id_column)
+    except ValueError:
+        raise ValueError(f"找不到列: {id_column}")
+
+    rows = []
+    for row_cells in worksheet.iter_rows(min_row=header_row + 1, max_row=worksheet.max_row):
+        values = [_clean_cell_value(cell.value) for cell in row_cells[: len(columns)]]
+        if values[id_index] is None:
+            continue
+        rows.append(values)
+    return columns, rows
+
+
+def _build_totals_row(columns, rows, id_column):
+    id_index = columns.index(id_column)
+    totals = [None] * len(columns)
+    totals[id_index] = f"合计（{len(rows)} 份合同）"
+    for col_index in range(len(columns)):
+        if col_index == id_index:
+            continue
+        non_null = [row[col_index] for row in rows if row[col_index] is not None]
+        if non_null and all(isinstance(v, (int, float)) for v in non_null):
+            totals[col_index] = sum(non_null)
+    return totals
+
+
+def _sum_range(worksheet, range_str):
+    values = _read_fixed_range_values(worksheet, range_str)
+    numeric_values = [v for v in values if isinstance(v, (int, float))]
+    return sum(numeric_values) if numeric_values else 0
+
+
 def _sheet_headers(worksheet, header_row, sub_row):
     headers = []
     last_top = None
@@ -341,6 +381,71 @@ def extract_chart(item, uploads_dir):
                     result["x"] = x
                 result["y"] = y
             return result
+        elif mode == "group_by":
+            columns, rows = _read_sheet_rows(
+                uploads_dir, item["source_file"], item["sheet"], item["header_row"], item["id_column"]
+            )
+            group_column = item["group_column"]
+            try:
+                group_index = columns.index(group_column)
+            except ValueError:
+                raise ValueError(f"找不到列: {group_column}")
+            agg = item.get("agg", "count")
+            sums = {}
+            if agg == "sum":
+                value_column = item["value_column"]
+                try:
+                    value_index = columns.index(value_column)
+                except ValueError:
+                    raise ValueError(f"找不到列: {value_column}")
+                for row in rows:
+                    group_value = row[group_index]
+                    if group_value is None:
+                        continue
+                    cell_value = row[value_index]
+                    numeric_value = cell_value if isinstance(cell_value, (int, float)) else 0
+                    sums[group_value] = sums.get(group_value, 0) + numeric_value
+            else:
+                for row in rows:
+                    group_value = row[group_index]
+                    if group_value is None:
+                        continue
+                    sums[group_value] = sums.get(group_value, 0) + 1
+            x = list(sums.keys())
+            y = [sums[k] for k in x]
+            return {
+                "key": key,
+                "type": item["type"],
+                "title": item["title"],
+                "x": x,
+                "y": y,
+                "error": None,
+            }
+        elif mode == "sum_bars":
+            worksheet = _load_worksheet(uploads_dir, item["source_file"], item["sheet"])
+            x = item["x"]
+            if "series" in item:
+                series = [
+                    {"name": s["name"], "data": [_sum_range(worksheet, r) for r in s["ranges"]]}
+                    for s in item["series"]
+                ]
+                return {
+                    "key": key,
+                    "type": item["type"],
+                    "title": item["title"],
+                    "x": x,
+                    "series": series,
+                    "error": None,
+                }
+            y = [_sum_range(worksheet, r) for r in item["ranges"]]
+            return {
+                "key": key,
+                "type": item["type"],
+                "title": item["title"],
+                "x": x,
+                "y": y,
+                "error": None,
+            }
         elif mode == "header_match":
             df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
             x_header = item["x_header"]
@@ -392,6 +497,24 @@ def extract_table(item, uploads_dir):
             if "detail_range" in item:
                 result["row_extra"] = _extract_detail_group(worksheet, item["detail_range"])
             return result
+        elif mode == "sheet_table":
+            columns, rows = _read_sheet_rows(
+                uploads_dir, item["source_file"], item["sheet"], item["header_row"], item["id_column"]
+            )
+            totals = None
+            if item.get("show_totals"):
+                totals = _build_totals_row(columns, rows, item["id_column"])
+            return {
+                "key": key,
+                "title": item["title"],
+                "columns": columns,
+                "rows": rows,
+                "error": None,
+                "view_group": item.get("view_group"),
+                "view_label": item.get("view_label"),
+                "status_column": item.get("status_column"),
+                "totals": totals,
+            }
         df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
         if mode == "header_match":
             columns = item["columns"]
@@ -447,6 +570,30 @@ def _resolve_computed_kpi(item, resolved_values):
         missing = from_key if from_value is None else minus_key
         return {"key": key, "label": label, "value": None, "error": f"引用的指标不存在或取值失败: {missing}"}
     return {"key": key, "label": label, "value": from_value - minus_value, "error": None}
+
+
+def _all_zero_or_none(values):
+    return all(v is None or v == 0 for v in values)
+
+
+def _chart_is_empty(chart):
+    if chart.get("error"):
+        return False
+    if "series" in chart:
+        return all(_all_zero_or_none(s["data"]) for s in chart["series"])
+    if "y" in chart:
+        return _all_zero_or_none(chart["y"])
+    return False
+
+
+def _apply_chart_hint(chart):
+    if _chart_is_empty(chart):
+        return {
+            "key": chart["key"],
+            "title": chart.get("title"),
+            "hint": "该图表依赖尚未回填的业务字段，暂无数据",
+        }
+    return chart
 
 
 def build_dashboard_data(config, uploads_dir):
@@ -514,7 +661,7 @@ def build_dashboard_data(config, uploads_dir):
 
     return {
         "kpis": kpi_results,
-        "charts": [extract_chart(item, uploads_dir) for item in config["charts"]],
+        "charts": [_apply_chart_hint(extract_chart(item, uploads_dir)) for item in config["charts"]],
         "tables": tables,
         "category_sources": category_sources,
     }

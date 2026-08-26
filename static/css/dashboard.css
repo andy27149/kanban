@@ -211,6 +211,16 @@ body {
   color: var(--error);
 }
 
+.chart-hint {
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  background: rgba(138, 128, 113, 0.08);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
 .table-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -295,6 +305,45 @@ body {
   color: var(--gold-deep);
   font-weight: 600;
   border-bottom-color: var(--gold);
+}
+
+.status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.status-badge {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-badge:hover {
+  border-color: var(--gold-border);
+  color: var(--gold-deep);
+}
+
+.status-badge.active {
+  background: var(--surface-tint);
+  border-color: var(--gold-border);
+  color: var(--gold-deep);
+  font-weight: 600;
+}
+
+.totals-row td {
+  font-weight: 700;
+  color: var(--text);
+  border-top: 2px solid var(--gold-border);
+  background: rgba(156, 122, 37, 0.06);
 }
 
 @media (max-width: 1024px) {
