@@ -6,3 +6,7 @@ uploads/*
 !uploads/.gitkeep
 data.json
 exports/
+.DS_Store
+.playwright-mcp/
+~$*.xlsx
+~$*.xls
