@@ -358,12 +358,6 @@ body {
   .dashboard-header h1 { font-size: 24px; }
 }
 
-.cell-clickable {
-  color: var(--gold-deep);
-  text-decoration: underline dotted;
-  cursor: pointer;
-}
-
 .row-clickable {
   cursor: pointer;
 }

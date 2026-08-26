@@ -19,9 +19,9 @@ function palette() {
   };
 }
 
-function kFormat(v) {
-  if (Math.abs(v) >= 1000) return (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
-  return String(v);
+function formatNumber(v) {
+  if (typeof v !== "number") return v;
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
 async function loadDashboardData() {
@@ -133,7 +133,7 @@ function buildChartOption(chart, chartEl) {
   if (chart.type === "pie") {
     return {
       textStyle: { color: p.text, fontFamily: 'Inter, sans-serif' },
-      tooltip: { trigger: "item" },
+      tooltip: { trigger: "item", valueFormatter: formatNumber },
       legend: { bottom: 0, textStyle: { color: p.muted, fontSize: 12 } },
       color: [p.gold, '#8c3a2e', '#5b6b7a', p.goldLight],
       series: [
@@ -217,8 +217,8 @@ function buildChartOption(chart, chartEl) {
 
   return {
     textStyle: { color: p.text, fontFamily: 'Inter, sans-serif' },
-    grid: { left: 44, right: 16, top: chart.series ? 36 : 20, bottom: rotate > 0 ? 48 : 28 },
-    tooltip: { trigger: "axis" },
+    grid: { left: 8, right: 16, top: chart.series ? 36 : 20, bottom: rotate > 0 ? 48 : 28, containLabel: true },
+    tooltip: { trigger: "axis", valueFormatter: formatNumber },
     legend: chart.series
       ? { top: 0, textStyle: { color: p.muted, fontSize: 12 } }
       : undefined,
@@ -231,7 +231,7 @@ function buildChartOption(chart, chartEl) {
     yAxis: {
       type: "value",
       splitLine: { lineStyle: { color: p.line } },
-      axisLabel: { color: p.muted, formatter: kFormat },
+      axisLabel: { color: p.muted, formatter: formatNumber },
     },
     series,
   };
@@ -376,30 +376,27 @@ function buildDataRow(table, row, rowIndex) {
     });
   }
 
-  row.forEach((cell, colIndex) => {
+  const categorySources = table.key === "category_summary" && dashboardData && dashboardData.category_sources
+    ? dashboardData.category_sources[row[0]]
+    : null;
+  if (categorySources) {
+    tr.classList.add("row-clickable");
+    tr.addEventListener("click", () => {
+      const wrap = document.createElement("div");
+      categorySources.forEach((segment) => {
+        const heading = document.createElement("div");
+        heading.className = "modal-subtitle";
+        heading.textContent = segment.sheet;
+        wrap.appendChild(heading);
+        wrap.appendChild(buildSimpleTable(segment.headers, segment.rows));
+      });
+      openModal(`矿区明细：${row[0]}`, wrap);
+    });
+  }
+
+  row.forEach((cell) => {
     const td = document.createElement("td");
     td.textContent = formatCell(cell);
-
-    const isRegionCell = table.key === "category_summary" && colIndex === 0;
-    const sources = isRegionCell && dashboardData && dashboardData.category_sources
-      ? dashboardData.category_sources[cell]
-      : null;
-    if (sources) {
-      td.classList.add("cell-clickable");
-      td.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const wrap = document.createElement("div");
-        sources.forEach((segment) => {
-          const heading = document.createElement("div");
-          heading.className = "modal-subtitle";
-          heading.textContent = segment.sheet;
-          wrap.appendChild(heading);
-          wrap.appendChild(buildSimpleTable(segment.headers, segment.rows));
-        });
-        openModal(`矿区明细：${cell}`, wrap);
-      });
-    }
-
     tr.appendChild(td);
   });
   return tr;
