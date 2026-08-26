@@ -1,4 +1,5 @@
 const chartInstances = {};
+let dashboardData = null;
 
 let chartResizeObserver = null;
 if ("ResizeObserver" in window) {
@@ -35,6 +36,7 @@ async function loadDashboardData() {
       }
       data = await response.json();
     }
+    dashboardData = data;
     renderKpis(data.kpis);
     renderCharts(data.charts);
     renderTables(data.tables);
@@ -160,6 +162,9 @@ function buildChartOption(chart, chartEl) {
               type: "bar",
               data: chart.y,
               barWidth: "46%",
+              label: chart.key === "inventory_balance_by_category"
+                ? { show: true, position: "top", color: p.text, fontSize: 11, formatter: (params) => Number(params.value.toFixed(2)) }
+                : undefined,
               itemStyle: {
                 borderRadius: [4, 4, 0, 0],
                 color: {
@@ -189,6 +194,18 @@ function buildChartOption(chart, chartEl) {
             },
       ];
 
+  if (chart.series && chart.key === "category_in_out" && chart.series.length === 2) {
+    const [inbound, outbound] = chart.series;
+    const diff = inbound.data.map((v, i) => Math.round(((v || 0) - (outbound.data[i] || 0)) * 100) / 100);
+    series.push({
+      name: "差额",
+      type: "bar",
+      data: diff,
+      barGap: "20%",
+      itemStyle: { borderRadius: [4, 4, 0, 0], color: "#5b6b7a" },
+    });
+  }
+
   return {
     textStyle: { color: p.text, fontFamily: 'Inter, sans-serif' },
     grid: { left: 44, right: 16, top: chart.series ? 36 : 20, bottom: rotate > 0 ? 48 : 28 },
@@ -209,6 +226,71 @@ function buildChartOption(chart, chartEl) {
     },
     series,
   };
+}
+
+function formatCell(cell) {
+  if (cell === null || cell === undefined) return "";
+  if (typeof cell === "number" && !Number.isInteger(cell)) return cell.toFixed(2);
+  return cell;
+}
+
+function ensureModal() {
+  let modal = document.getElementById("drill-modal");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "drill-modal";
+  modal.className = "modal-overlay hidden";
+  modal.innerHTML =
+    '<div class="modal-box">' +
+    '<div class="modal-header"><span class="modal-title"></span><button type="button" class="modal-close" aria-label="关闭">&times;</button></div>' +
+    '<div class="modal-body"></div>' +
+    "</div>";
+  modal.querySelector(".modal-close").addEventListener("click", closeModal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeModal();
+  });
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function closeModal() {
+  const modal = document.getElementById("drill-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function openModal(title, bodyEl) {
+  const modal = ensureModal();
+  modal.querySelector(".modal-title").textContent = title;
+  const body = modal.querySelector(".modal-body");
+  body.innerHTML = "";
+  body.appendChild(bodyEl);
+  modal.classList.remove("hidden");
+}
+
+function buildSimpleTable(columns, rows) {
+  const table = document.createElement("table");
+  table.className = "data-table";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  columns.forEach((col) => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    row.forEach((cell) => {
+      const td = document.createElement("td");
+      td.textContent = formatCell(cell);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
 }
 
 function renderTables(tables) {
@@ -294,11 +376,46 @@ function buildTableBody(table) {
   tableEl.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  table.rows.forEach((row) => {
+  table.rows.forEach((row, rowIndex) => {
     const tr = document.createElement("tr");
-    row.forEach((cell) => {
+
+    const rowExtra = table.key === "outbound_detail" && Array.isArray(table.row_extra)
+      ? table.row_extra[rowIndex] || []
+      : null;
+    if (rowExtra && rowExtra.length > 0) {
+      tr.classList.add("row-clickable");
+      tr.addEventListener("click", () => {
+        openModal(
+          "配煤品类明细",
+          buildSimpleTable(["品类/指标", "数值（吨）"], rowExtra.map((e) => [e.label, e.value]))
+        );
+      });
+    }
+
+    row.forEach((cell, colIndex) => {
       const td = document.createElement("td");
-      td.textContent = cell === null || cell === undefined ? "" : cell;
+      td.textContent = formatCell(cell);
+
+      const isRegionCell = table.key === "category_summary" && colIndex === 0;
+      const sources = isRegionCell && dashboardData && dashboardData.category_sources
+        ? dashboardData.category_sources[cell]
+        : null;
+      if (sources) {
+        td.classList.add("cell-clickable");
+        td.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const wrap = document.createElement("div");
+          sources.forEach((segment) => {
+            const heading = document.createElement("div");
+            heading.className = "modal-subtitle";
+            heading.textContent = segment.sheet;
+            wrap.appendChild(heading);
+            wrap.appendChild(buildSimpleTable(segment.headers, segment.rows));
+          });
+          openModal(`矿区明细：${cell}`, wrap);
+        });
+      }
+
       tr.appendChild(td);
     });
     tbody.appendChild(tr);

@@ -308,3 +308,90 @@ body {
   .dashboard-header { padding: 20px 16px 18px; }
   .dashboard-header h1 { font-size: 24px; }
 }
+
+.cell-clickable {
+  color: var(--gold-deep);
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+
+.row-clickable {
+  cursor: pointer;
+}
+
+.row-clickable:hover td {
+  background: rgba(156, 122, 37, 0.1);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 38, 32, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-box {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--card-shadow-lg);
+  max-width: min(860px, 100%);
+  max-height: min(80vh, 720px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.modal-close {
+  appearance: none;
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 16px 20px 20px;
+  overflow: auto;
+}
+
+.modal-subtitle {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 14px 0 6px;
+}
+
+.modal-subtitle:first-child {
+  margin-top: 0;
+}

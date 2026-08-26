@@ -23,12 +23,6 @@ kpis:
     sheet: "合计"
     mode: fixed_range
     range: "L17"
-  - key: transfer_loss
-    label: "倒运亏合计（吨）"
-    source_file: "基础表.xlsx"
-    sheet: "合计"
-    mode: fixed_range
-    range: "J17"
 
 charts:
   - key: category_in_out
@@ -59,6 +53,7 @@ charts:
     mode: fixed_range
     x_range: "B8:B22"
     y_range: "G8:G22"
+    group_by: month
 
 tables:
   - key: category_summary
@@ -67,14 +62,12 @@ tables:
     sheet: "合计"
     mode: fixed_range
     columns:
-      - label: "品类"
+      - label: "矿区"
         range: "B6:B16"
       - label: "入库合计（吨）"
         range: "E6:E16"
       - label: "出库合计（吨）"
         range: "I6:I16"
-      - label: "倒运亏（吨）"
-        range: "J6:J16"
       - label: "库存余额（吨）"
         range: "K6:K16"
       - label: "锦州港实际库存（吨）"
@@ -105,17 +98,24 @@ tables:
         range: "AK8:AK22"
       - label: "收货人"
         range: "AL8:AL22"
+    detail_range:
+      group_label: "配煤品类"
+      group_label_row: 5
+      category_row: 6
+      metric_row: 7
+      data_start_row: 8
+      data_end_row: 22
     view_group: outbound_view
     view_label: "出库明细"
-  - key: outbound_by_region
-    title: "出库按矿区汇总"
+  - key: outbound_by_shipper
+    title: "出库按发货单位汇总"
     source_file: "基础表.xlsx"
-    sheet: "出库明细"
-    mode: fixed_range
-    columns:
-      - label: "矿区"
-        range: "B28:B37"
-      - label: "出库数量（吨）"
-        range: "D28:D37"
+    mode: shipper_summary
     view_group: outbound_view
-    view_label: "按矿区汇总"
+    view_label: "按发货单位汇总"
+  - key: outbound_by_shipper_monthly
+    title: "出库按发货单位汇总"
+    source_file: "基础表.xlsx"
+    mode: shipper_summary_monthly
+    view_group: outbound_view
+    view_label: "按发货单位月度明细"
