@@ -66,7 +66,7 @@ server {
 ## 日常操作
 
 - **上传新 Excel 数据**：直接通过浏览器访问 `https://你的域名/upload`，用 `UPLOAD_PASSWORD` 登录后上传，无需重启容器——上传后应用会立即重新生成 `data.json`。
-- **修改 `config.yaml`**：直接编辑宿主机上的 `config.yaml` 文件，然后 `docker compose restart kanban` 使其生效，无需重新 build 镜像。
+- **修改 `config.yaml`**：`data.json` 只在每次 `/upload` 上传时重新生成（详见 `app.py` 里 `build_dashboard_data` 的唯一调用点），单纯 `docker compose restart` **不会**让新配置生效，看板会继续显示旧配置生成的数据。正确做法：编辑完 `config.yaml` 后，到 `/upload` 页面重新上传一次 Excel（哪怕文件内容没变，重新上传同一份文件也会用最新的 `config.yaml` 重新计算并覆盖 `data.json`）。因为 `config.yaml` 是每次上传请求时才从磁盘读取的，所以既不需要 restart，也不需要重新 build 镜像。
 - **更新代码后重新部署**：
 
   ```bash
@@ -90,5 +90,5 @@ server {
 
 ## 排查
 
-- 容器起不来：`docker compose logs kanban` 看报错，常见原因是 `.env` 里密钥留空或 `data/data.json` 被建成了目录（删掉重建成空文件）。
+- 容器起不来：`docker compose logs kanban` 看报错，常见原因是 `.env` 里密钥留空，或 `data/data.json` 被 Docker 误建成了目录（删掉后按 Step 3 的方法重建成合法的空 JSON 文件，不是空文件）。
 - nginx 502：确认容器确实在监听 `127.0.0.1:5000`（`docker compose ps`、`curl http://127.0.0.1:5000/dashboard`），以及 nginx 配置里的 `proxy_pass` 端口一致。
