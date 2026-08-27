@@ -1,0 +1,12 @@
+services:
+  kanban:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./data/uploads:/app/uploads
+      - ./data/data.json:/app/data.json
+      - ./config.yaml:/app/config.yaml

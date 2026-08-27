@@ -60,4 +60,4 @@ pytest -v
 
 ## 部署说明
 
-当前架构本地运行与服务器部署无需改动核心代码——只需将 `python app.py` 换成生产级 WSGI 服务器（如 `gunicorn app:create_app()`），并确保 `UPLOAD_PASSWORD`/`FLASK_SECRET_KEY` 通过环境变量正确设置。
+生产环境部署（Docker + 宿主机 nginx 反向代理）见 [DEPLOY.md](DEPLOY.md)。
