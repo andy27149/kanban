@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from extractor import build_dashboard_data, extract_chart, extract_table, load_config
+from extractor import build_dashboard_data, extract_chart, extract_kpi, extract_table, load_config
 
 
 def test_extract_table_sheet_table_reads_rows_and_skips_blank_id(uploads_dir, make_workbook):
@@ -310,6 +310,119 @@ def test_build_dashboard_data_does_not_hint_a_chart_with_error(uploads_dir):
     assert "hint" not in data["charts"][0]
 
 
+def test_extract_kpi_header_sum_sums_single_column(uploads_dir, make_workbook):
+    make_workbook(
+        "上下游结算.xlsx",
+        {
+            "上游结算": [
+                ["采购管理表"],
+                ["合同编号", "煤款金额", "已付金额"],
+                ["HT-001", 1000, 800],
+                ["HT-002", 2000, 1500],
+            ]
+        },
+    )
+    item = {
+        "key": "purchase_coal_amount",
+        "label": "采购煤款金额合计（元）",
+        "source_file": "上下游结算.xlsx",
+        "sheet": "上游结算",
+        "mode": "header_sum",
+        "header_row": 2,
+        "id_column": "合同编号",
+        "value_columns": ["煤款金额"],
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["error"] is None
+    assert result["value"] == 3000
+
+
+def test_extract_kpi_header_sum_sums_multiple_columns(uploads_dir, make_workbook):
+    make_workbook(
+        "上下游结算.xlsx",
+        {
+            "下游结算": [
+                ["销售管理表"],
+                ["合同编号", "已回金额1", "已回金额2"],
+                ["XS-001", 1000, 500],
+                ["XS-002", 2000, None],
+            ]
+        },
+    )
+    item = {
+        "key": "sales_received_amount",
+        "label": "销售已回金额合计（元）",
+        "source_file": "上下游结算.xlsx",
+        "sheet": "下游结算",
+        "mode": "header_sum",
+        "header_row": 2,
+        "id_column": "合同编号",
+        "value_columns": ["已回金额1", "已回金额2"],
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["error"] is None
+    assert result["value"] == 3500
+
+
+def test_extract_kpi_header_sum_returns_none_when_table_has_no_data(uploads_dir, make_workbook):
+    make_workbook(
+        "上下游结算.xlsx",
+        {
+            "上游结算": [
+                ["采购管理表"],
+                ["合同编号", "煤款金额"],
+            ]
+        },
+    )
+    item = {
+        "key": "purchase_coal_amount",
+        "label": "采购煤款金额合计（元）",
+        "source_file": "上下游结算.xlsx",
+        "sheet": "上游结算",
+        "mode": "header_sum",
+        "header_row": 2,
+        "id_column": "合同编号",
+        "value_columns": ["煤款金额"],
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["error"] is None
+    assert result["value"] is None
+
+
+def test_extract_kpi_header_sum_disambiguates_duplicate_headers(uploads_dir, make_workbook):
+    make_workbook(
+        "上下游结算.xlsx",
+        {
+            "上游结算": [
+                ["采购管理表"],
+                ["合同编号", "煤款金额", "已付金额", "未付金额", "应退金额", "运费金额", "已付金额", "未付金额", "应退金额"],
+                ["HT-001", 1000, 800, 200, 0, 100, 90, 10, 0],
+            ]
+        },
+    )
+    item = {
+        "key": "purchase_paid_amount",
+        "label": "采购已付金额合计（元）",
+        "source_file": "上下游结算.xlsx",
+        "sheet": "上游结算",
+        "mode": "header_sum",
+        "header_row": 2,
+        "id_column": "合同编号",
+        "value_columns": ["已付金额"],
+    }
+
+    result = extract_kpi(item, uploads_dir)
+
+    assert result["error"] is None
+    assert result["value"] == 800
+
+
 def test_config_yaml_includes_settlement_tables_and_charts():
     config_path = Path(__file__).resolve().parent.parent / "config.yaml"
     config = load_config(config_path)
@@ -317,12 +430,23 @@ def test_config_yaml_includes_settlement_tables_and_charts():
     table_keys = {t["key"] for t in config["tables"]}
     assert {"purchase_contracts", "order_management", "sales_contracts"} <= table_keys
 
-    chart_keys = {c["key"] for c in config["charts"]}
+    kpi_keys = {k["key"] for k in config["kpis"]}
     assert {
-        "purchase_volume_by_region",
+        "purchase_coal_amount",
+        "purchase_paid_amount",
+        "purchase_unpaid_amount",
+        "purchase_refund_amount",
+        "sales_settlement_amount",
+        "sales_received_amount",
+        "sales_pending_amount",
+    } <= kpi_keys
+
+    chart_keys = {c["key"] for c in config["charts"]}
+    assert {"purchase_volume_by_region"} <= chart_keys
+    assert {
         "purchase_progress_distribution",
         "order_status_distribution",
         "sales_status_distribution",
         "purchase_payment_status",
         "sales_collection_status",
-    } <= chart_keys
+    }.isdisjoint(chart_keys)

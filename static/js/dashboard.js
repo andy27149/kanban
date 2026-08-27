@@ -41,7 +41,7 @@ async function loadDashboardData() {
     renderCharts(data.charts);
     renderTables(data.tables);
     document.getElementById("last-sync").textContent =
-      "LAST SYNC " + new Date().toLocaleString("zh-CN", { hour12: false });
+      "数据更新时间 " + (data.generated_at || "未知");
   } catch (error) {
     console.error("Failed to load dashboard data:", error);
     const container = document.getElementById("kpi-section");
@@ -56,7 +56,18 @@ async function loadDashboardData() {
 function renderKpis(kpis) {
   const container = document.getElementById("kpi-section");
   container.innerHTML = "";
+  let lastGroup = null;
   kpis.forEach((kpi, index) => {
+    if (kpi.group && kpi.group !== lastGroup) {
+      const groupEl = document.createElement("div");
+      groupEl.className = "kpi-group-label";
+      groupEl.innerHTML =
+        `<span class="kpi-group-icon">${kpi.group_icon || ""}</span>` +
+        `<span>${kpi.group_label || kpi.group}</span>`;
+      container.appendChild(groupEl);
+    }
+    lastGroup = kpi.group || null;
+
     const card = document.createElement("div");
     card.className = "kpi-card" + (index === 0 ? " hero" : "");
     if (kpi.error) {
@@ -76,8 +87,9 @@ function renderKpis(kpis) {
       card.appendChild(labelEl);
 
       const valueEl = document.createElement("div");
-      valueEl.className = "kpi-value";
-      valueEl.textContent = kpi.value;
+      const isEmpty = kpi.value === null || kpi.value === undefined;
+      valueEl.className = "kpi-value" + (isEmpty ? " kpi-empty" : "");
+      valueEl.textContent = isEmpty ? "暂无数据" : formatNumber(kpi.value);
       card.appendChild(valueEl);
     }
     container.appendChild(card);
@@ -89,7 +101,7 @@ function renderCharts(charts) {
   container.innerHTML = "";
   charts.forEach((chart) => {
     const wrapper = document.createElement("div");
-    wrapper.className = "chart-card";
+    wrapper.className = "chart-card" + (chart.key === "category_in_out" ? " chart-card--wide" : "");
 
     const titleEl = document.createElement("div");
     titleEl.className = "chart-title";
@@ -154,12 +166,24 @@ function buildChartOption(chart, chartEl) {
   const rotate = pxPerLabel < 60 ? 45 : pxPerLabel < 80 ? 28 : 0;
   const seriesColors = [p.goldDeep, '#5b6b7a', '#8c3a2e', p.goldLight];
 
+  const labeledBarCharts = ["inventory_balance_by_category", "purchase_volume_by_region"];
+
   const series = chart.series
     ? chart.series.map((s, i) => ({
         name: s.name,
         type: "bar",
         data: s.data,
         barGap: "20%",
+        label: chart.key === "category_in_out"
+          ? {
+              show: true,
+              position: "top",
+              offset: [0, i === 0 ? -14 : 0],
+              color: p.text,
+              fontSize: 10,
+              formatter: (params) => formatNumber(params.value),
+            }
+          : undefined,
         itemStyle: {
           borderRadius: [4, 4, 0, 0],
           color: seriesColors[i % seriesColors.length],
@@ -171,8 +195,8 @@ function buildChartOption(chart, chartEl) {
               type: "bar",
               data: chart.y,
               barWidth: "46%",
-              label: chart.key === "inventory_balance_by_category"
-                ? { show: true, position: "top", color: p.text, fontSize: 11, formatter: (params) => Number(params.value.toFixed(2)) }
+              label: labeledBarCharts.includes(chart.key)
+                ? { show: true, position: "top", color: p.text, fontSize: 11, formatter: (params) => formatNumber(params.value) }
                 : undefined,
               itemStyle: {
                 borderRadius: [4, 4, 0, 0],
@@ -202,18 +226,6 @@ function buildChartOption(chart, chartEl) {
               },
             },
       ];
-
-  if (chart.series && chart.key === "category_in_out" && chart.series.length === 2) {
-    const [inbound, outbound] = chart.series;
-    const diff = inbound.data.map((v, i) => Math.round(((v || 0) - (outbound.data[i] || 0)) * 100) / 100);
-    series.push({
-      name: "差额",
-      type: "bar",
-      data: diff,
-      barGap: "20%",
-      itemStyle: { borderRadius: [4, 4, 0, 0], color: "#5b6b7a" },
-    });
-  }
 
   return {
     textStyle: { color: p.text, fontFamily: 'Inter, sans-serif' },

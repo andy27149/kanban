@@ -336,23 +336,48 @@ def _extract_detail_group(worksheet, spec):
 def extract_kpi(item, uploads_dir):
     key = item["key"]
     label = item["label"]
+    group_fields = {
+        k: item[k] for k in ("group", "group_icon", "group_label") if k in item
+    }
     try:
-        if item["mode"] == "fixed_range":
+        mode = item["mode"]
+        if mode == "fixed_range":
             worksheet = _load_worksheet(uploads_dir, item["source_file"], item["sheet"])
             values = _read_fixed_range_values(worksheet, item["range"])
-        elif item["mode"] == "header_match":
+            numeric_values = [v for v in values if isinstance(v, (int, float))]
+            value = sum(numeric_values) if numeric_values else None
+        elif mode == "header_match":
             df = _read_dataframe(uploads_dir, item["source_file"], item["sheet"])
             header = item["header"]
             if header not in df.columns:
                 raise ValueError(f"找不到表头: '{header}'")
             values = [_clean_value(v) for v in df[header].tolist()]
+            numeric_values = [v for v in values if isinstance(v, (int, float))]
+            value = sum(numeric_values) if numeric_values else None
+        elif mode == "header_sum":
+            columns, rows = _read_sheet_rows(
+                uploads_dir, item["source_file"], item["sheet"], item["header_row"], item["id_column"]
+            )
+            if not rows:
+                value = None
+            else:
+                indices = []
+                for col in item["value_columns"]:
+                    try:
+                        indices.append(columns.index(col))
+                    except ValueError:
+                        raise ValueError(f"找不到列: {col}")
+                value = sum(
+                    row[idx]
+                    for row in rows
+                    for idx in indices
+                    if isinstance(row[idx], (int, float))
+                )
         else:
-            raise ValueError(f"未知的取数模式: {item['mode']}")
-        numeric_values = [v for v in values if isinstance(v, (int, float))]
-        value = sum(numeric_values) if numeric_values else None
-        return {"key": key, "label": label, "value": value, "error": None}
+            raise ValueError(f"未知的取数模式: {mode}")
+        return {"key": key, "label": label, "value": value, "error": None, **group_fields}
     except Exception as exc:
-        return {"key": key, "label": label, "value": None, "error": str(exc)}
+        return {"key": key, "label": label, "value": None, "error": str(exc), **group_fields}
 
 
 def extract_chart(item, uploads_dir):
@@ -664,6 +689,7 @@ def build_dashboard_data(config, uploads_dir):
         "charts": [_apply_chart_hint(extract_chart(item, uploads_dir)) for item in config["charts"]],
         "tables": tables,
         "category_sources": category_sources,
+        "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
 

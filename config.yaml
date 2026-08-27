@@ -23,6 +23,83 @@ kpis:
     sheet: "合计"
     mode: fixed_range
     range: "L17"
+  - key: purchase_coal_amount
+    label: "采购煤款金额合计（元）"
+    group: purchase
+    group_icon: "🛒"
+    group_label: "采购指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "上游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["煤款金额"]
+  - key: purchase_paid_amount
+    label: "采购已付金额合计（元）"
+    group: purchase
+    group_icon: "🛒"
+    group_label: "采购指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "上游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["已付金额"]
+  - key: purchase_unpaid_amount
+    label: "采购未付金额合计（元）"
+    group: purchase
+    group_icon: "🛒"
+    group_label: "采购指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "上游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["未付金额"]
+  - key: purchase_refund_amount
+    label: "采购应退金额合计（元）"
+    group: purchase
+    group_icon: "🛒"
+    group_label: "采购指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "上游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["应退金额"]
+  - key: sales_settlement_amount
+    label: "销售结算金额合计（元）"
+    group: sales
+    group_icon: "💰"
+    group_label: "销售指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "下游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["结算金额"]
+  - key: sales_received_amount
+    label: "销售已回金额合计（元）"
+    group: sales
+    group_icon: "💰"
+    group_label: "销售指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "下游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["已回金额1", "已回金额2"]
+  - key: sales_pending_amount
+    label: "销售待回金额合计（元）"
+    group: sales
+    group_icon: "💰"
+    group_label: "销售指标"
+    source_file: "上下游结算.xlsx"
+    sheet: "下游结算"
+    mode: header_sum
+    header_row: 2
+    id_column: "合同编号"
+    value_columns: ["待回金额"]
 
 charts:
   - key: category_in_out
@@ -65,57 +142,6 @@ charts:
     id_column: "合同编号"
     group_column: "矿区"
     value_column: "结算数量"
-  - key: purchase_progress_distribution
-    type: pie
-    title: "采购合同进度分布"
-    source_file: "上下游结算.xlsx"
-    sheet: "上游结算"
-    mode: group_by
-    agg: count
-    header_row: 2
-    id_column: "合同编号"
-    group_column: "进度"
-  - key: order_status_distribution
-    type: pie
-    title: "订单状态分布"
-    source_file: "上下游结算.xlsx"
-    sheet: "下游订单管理"
-    mode: group_by
-    agg: count
-    header_row: 2
-    id_column: "合同编号"
-    group_column: "状态"
-  - key: sales_status_distribution
-    type: pie
-    title: "销售合同状态分布"
-    source_file: "上下游结算.xlsx"
-    sheet: "下游结算"
-    mode: group_by
-    agg: count
-    header_row: 2
-    id_column: "合同编号"
-    group_column: "状态"
-  - key: purchase_payment_status
-    type: bar
-    title: "采购煤款/运费收付情况（元）"
-    source_file: "上下游结算.xlsx"
-    sheet: "上游结算"
-    mode: sum_bars
-    x: ["已付金额", "未付金额", "应退金额"]
-    series:
-      - name: "煤款"
-        ranges: ["K3:K12", "L3:L12", "M3:M12"]
-      - name: "运费"
-        ranges: ["P3:P12", "Q3:Q12", "R3:R12"]
-  - key: sales_collection_status
-    type: bar
-    title: "销售回款情况（元）"
-    source_file: "上下游结算.xlsx"
-    sheet: "下游结算"
-    mode: sum_bars
-    x: ["结算金额合计", "已回金额合计", "待回金额合计"]
-    ranges: ["O3:O21", "T3:T21", "U3:U21"]
-
 tables:
   - key: category_summary
     title: "品类汇总表"
