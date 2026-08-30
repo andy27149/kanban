@@ -83,3 +83,12 @@
 - **引入的假设:**
   - `sum_bars` 两张预留图表(采购煤款/运费收付情况、销售回款情况)当前样本数据未出现全零情况,`chart.hint` 兜底路径仅由单元测试覆盖,未在真实数据上触发过——如果后续这两列业务字段确实长期为空,应实测一次真实的 hint 展示效果。
   - "进度"/"状态"列的徽章分组假设列里的值是有限的枚举字符串;如果这两列以后出现自由文本或大量唯一值,徽章 UI 会退化(徽章数量爆炸),届时需要重新设计筛选交互,而非简单复用当前实现。
+
+### 2026-08-30 — 支持子路径部署(https://exam.feemore.cn/kanban)
+- **做了什么:** 为部署在域名子路径下(而非根路径)提前做兼容。`static/js/dashboard.js` 里 `fetch("/api/data")` 改成相对路径 `fetch("api/data")`。`app.py` 的 `create_app()` 里用 Werkzeug 自带的 `ProxyFix` 包了一层 `app.wsgi_app`(只信任一层代理:`x_for/x_proto/x_host/x_port/x_prefix` 均为 1),让 nginx 传来的 `X-Forwarded-Prefix` 头能让 `url_for()` 生成的所有链接(静态资源、`/`→`/dashboard`、`/login`→`/upload` 跳转、session cookie path)自动带上子路径前缀。`DEPLOY.md` 补充了子路径部署的 nginx 示例。`tests/test_app.py` 新增 4 个测试覆盖相对路径 fetch 和 `X-Forwarded-Prefix` 场景。65 个测试全部通过,并用 Playwright 在根路径下手动验证过看板渲染无回归。
+- **做了什么决定:**
+  - 前端 API 请求用"相对路径"而不是"读取一个注入的 base path 配置",因为相对路径对根路径/子路径部署都天然正确,不需要新增任何配置项或模板变量。
+  - 后端信任层数固定写死为 1(不做成可配置项),因为 `DEPLOY.md` 里容器只监听 `127.0.0.1:5000`,中间只有宿主机 nginx 一层代理——这是当前唯一的部署拓扑,写死比引入配置项更简单,如果以后部署拓扑变了(比如 CDN→nginx→容器两层代理)需要回来调整这个数字。
+- **引入的假设:**
+  - 假设反向代理只有宿主机 nginx 这一层,且 nginx 是可信的(不会被伪造 `X-Forwarded-*` 头)。这个假设目前成立是因为容器不直接暴露给公网;如果以后架构变化(容器直接对公网监听,或前面多加一层代理),需要重新评估 `ProxyFix` 的信任层数,否则可能被伪造头欺骗。
+  - 子路径部署的 nginx 配置(`X-Forwarded-Prefix`)只写了文档和后端支持,尚未在真实的 `exam.feemore.cn/kanban` 环境里实测过端到端效果(本地只用 test client 模拟了请求头,未跑真实 nginx)——正式部署后应该访问一次线上地址确认链接/资源都正确。

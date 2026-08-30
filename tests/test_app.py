@@ -300,3 +300,22 @@ def test_dashboard_js_includes_table_view_group_tabs(client):
     body = response.data.decode("utf-8")
     assert "renderTableGroup" in body
     assert "view_group" in body
+
+
+def test_dashboard_js_fetches_api_data_with_relative_path(client):
+    response = client.get("/static/js/dashboard.js")
+    body = response.data.decode("utf-8")
+    assert 'fetch("api/data")' in body
+
+
+def test_index_redirect_honors_forwarded_prefix(client):
+    response = client.get("/", headers={"X-Forwarded-Prefix": "/kanban"})
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/kanban/dashboard"
+
+
+def test_dashboard_static_links_honor_forwarded_prefix(client):
+    response = client.get("/dashboard", headers={"X-Forwarded-Prefix": "/kanban"})
+    html = response.data.decode("utf-8")
+    assert "/kanban/static/css/dashboard.css" in html
+    assert "/kanban/static/js/dashboard.js" in html

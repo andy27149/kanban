@@ -30,7 +30,7 @@ async function loadDashboardData() {
     if (window.__DASHBOARD_DATA__) {
       data = window.__DASHBOARD_DATA__;
     } else {
-      const response = await fetch("/api/data");
+      const response = await fetch("api/data");
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }

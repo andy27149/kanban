@@ -4,6 +4,7 @@ from functools import wraps
 from pathlib import Path
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from extractor import build_dashboard_data, load_config, load_data_json, save_data_json
 
@@ -21,6 +22,10 @@ def _is_safe_filename(filename):
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    # 只信任紧挨着的一层反向代理(宿主机 nginx)，让部署在子路径下
+    # (如 /kanban)时，nginx 传来的 X-Forwarded-Prefix 能让 url_for()
+    # 生成的链接/跳转/静态资源自动带上前缀。
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
     app.config.update(
         UPLOAD_PASSWORD=os.environ.get("UPLOAD_PASSWORD", "changeme"),
         SECRET_KEY=os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-me"),

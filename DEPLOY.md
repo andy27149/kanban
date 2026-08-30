@@ -63,6 +63,30 @@ server {
 
 改完后 `nginx -t` 测试配置，再 `systemctl reload nginx`（或对应发行版的 reload 命令）。如需 HTTPS，用 certbot 等工具在这个 server block 上申请证书即可，容器内部无需感知。
 
+### 部署在子路径下（例如 https://example.com/kanban）
+
+如果看板不是挂在域名根路径，而是某个已有域名/子域名下的子路径，`location` 换成对应路径，并且必须多加一行 `X-Forwarded-Prefix`，应用才能正确生成带前缀的链接：
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    location /kanban/ {
+        proxy_pass http://127.0.0.1:5000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Prefix /kanban;
+    }
+}
+```
+
+注意两点：
+- `location /kanban/` 和 `proxy_pass http://127.0.0.1:5000/` 都要带末尾斜杠，这样 nginx 会把 `/kanban/` 前缀剥离后再转发给容器（容器内看到的还是 `/dashboard`、`/api/data` 这些不带前缀的路径）。
+- 一定要加 `proxy_set_header X-Forwarded-Prefix /kanban;`，应用靠这个头把前缀补回 `url_for()` 生成的链接和跳转地址里，漏掉这行会导致静态资源 404、登录/上传跳转错地方。
+
 ## 日常操作
 
 - **上传新 Excel 数据**：直接通过浏览器访问 `https://你的域名/upload`，用 `UPLOAD_PASSWORD` 登录后上传，无需重启容器——上传后应用会立即重新生成 `data.json`。
