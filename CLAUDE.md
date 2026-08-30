@@ -84,6 +84,18 @@
   - `sum_bars` 两张预留图表(采购煤款/运费收付情况、销售回款情况)当前样本数据未出现全零情况,`chart.hint` 兜底路径仅由单元测试覆盖,未在真实数据上触发过——如果后续这两列业务字段确实长期为空,应实测一次真实的 hint 展示效果。
   - "进度"/"状态"列的徽章分组假设列里的值是有限的枚举字符串;如果这两列以后出现自由文本或大量唯一值,徽章 UI 会退化(徽章数量爆炸),届时需要重新设计筛选交互,而非简单复用当前实现。
 
+### 2026-08-30 — 上传成功后自动跳转看板 + 子路径部署支持
+- **做了什么:**
+  1. 支持子路径部署(`https://exam.feemore.cn/kanban`):`app.py` 引入 `werkzeug.middleware.proxy_fix.ProxyFix`(只信任一层反代,`x_for=x_proto=x_host=x_port=x_prefix=1`),使 nginx 传来的 `X-Forwarded-Prefix` 能让 `url_for()` 生成带前缀的链接/跳转;`static/js/dashboard.js` 里 `fetch("/api/data")` 改成相对路径 `fetch("api/data")`;`DEPLOY.md` 补充子路径部署的 nginx 示例段落。新增 3 个测试验证 `X-Forwarded-Prefix` 行为和相对路径 fetch。已提交并推送(commit `f81a759`)。
+  2. 上传成功后自动跳转看板:`app.py` 的 `/upload` 路由里,`saved` 非空时 `redirect(url_for("dashboard"))`,否则(全部文件被拒绝)仍 `redirect(url_for("upload"))`;`templates/dashboard.html` 新增 flash 消息渲染区块(`get_flashed_messages(with_categories=true)`),`static/css/dashboard.css` 新增 `.flash-stack`/`.flash-banner`/`.flash-success`/`.flash-warning`/`.flash-error` 样式,复用现有金色/米色配色变量。新增 3 个测试(重定向到 dashboard、全部被拒绝时留在 upload 页、dashboard 页面能看到成功提示)。全部 68 个测试通过,并用 Playwright 手动验证了真实浏览器里登录→上传→自动跳转→看到"已成功保存并解析 N 个文件"提示的完整流程,控制台无报错。**尚未提交**,等待用户确认是否需要 commit/push。
+- **做了什么决定:**
+  - 只有 `saved`(成功保存的文件列表)非空才跳转到 dashboard;如果所有文件都被拒绝(如非 .xlsx 扩展名),保留原行为——留在 upload 页,让用户看到拒绝原因并重新选择文件,而不是跳到一个数据没有任何变化的 dashboard。
+  - flash 消息只加在 `dashboard.html`,不加在 `upload.html`——因为跳转后用户是在 dashboard 页面看到反馈,upload 页面本身不再需要展示上传结果。
+  - flash 消息样式复用 `:root` 里已有的 CSS 变量(`--gold-deep`、`--error` 等),不引入新的配色体系,保持与看板整体视觉一致。
+- **引入的假设:**
+  - flash 消息依赖 Flask session cookie;子路径部署下 session cookie 的 path 由 `ProxyFix` 设置的 `SCRIPT_NAME` 决定,理论上应该正确带上 `/kanban` 前缀,但这个组合(子路径部署 + flash 消息)尚未在真实 nginx 环境下端到端验证过,仅验证过根路径部署场景。
+  - 未处理"上传成功但跳转前用户关闭标签页"之类的边界情况——flash 消息如果一直没被 `/dashboard` 页面消费,会在下一次任意页面请求时因 Flask 的 `get_flashed_messages()` 语义而被清空,不会无限累积,但也意味着如果用户跳过了这次 dashboard 访问,提示会静默丢失,目前认为可接受。
+
 ### 2026-08-30 — 支持子路径部署(https://exam.feemore.cn/kanban)
 - **做了什么:** 为部署在域名子路径下(而非根路径)提前做兼容。`static/js/dashboard.js` 里 `fetch("/api/data")` 改成相对路径 `fetch("api/data")`。`app.py` 的 `create_app()` 里用 Werkzeug 自带的 `ProxyFix` 包了一层 `app.wsgi_app`(只信任一层代理:`x_for/x_proto/x_host/x_port/x_prefix` 均为 1),让 nginx 传来的 `X-Forwarded-Prefix` 头能让 `url_for()` 生成的所有链接(静态资源、`/`→`/dashboard`、`/login`→`/upload` 跳转、session cookie path)自动带上子路径前缀。`DEPLOY.md` 补充了子路径部署的 nginx 示例。`tests/test_app.py` 新增 4 个测试覆盖相对路径 fetch 和 `X-Forwarded-Prefix` 场景。65 个测试全部通过,并用 Playwright 在根路径下手动验证过看板渲染无回归。
 - **做了什么决定:**

@@ -1,11 +1,14 @@
 from collections import defaultdict
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import datetime
 import json
 
 import openpyxl
 import pandas as pd
 import yaml
+
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 
 # 批次分表 -> 品类/矿区代码的映射，按"计量标准"（磅单/载重）对账 合计 表 E 列每个品类的
@@ -689,7 +692,7 @@ def build_dashboard_data(config, uploads_dir):
         "charts": [_apply_chart_hint(extract_chart(item, uploads_dir)) for item in config["charts"]],
         "tables": tables,
         "category_sources": category_sources,
-        "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": datetime.datetime.now(CHINA_TZ).strftime("%Y-%m-%d %H:%M:%S"),
     }
 
 

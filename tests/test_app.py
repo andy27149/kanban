@@ -233,6 +233,72 @@ def test_upload_with_corrupted_excel_file_does_not_crash(client, tmp_path):
     assert data2["kpis"][0]["value"] == 42
 
 
+def test_upload_redirects_to_dashboard_on_success(client, tmp_path):
+    import openpyxl
+
+    client.post("/login", data={"password": "test-pass"})
+
+    (tmp_path / "config.yaml").write_text(
+        "kpis:\n"
+        "  - key: total_revenue\n"
+        "    label: \"总营收\"\n"
+        "    source_file: \"经营数据.xlsx\"\n"
+        "    sheet: \"汇总\"\n"
+        "    mode: fixed_range\n"
+        "    range: \"B2\"\n"
+        "charts: []\n"
+        "tables: []\n",
+        encoding="utf-8",
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "汇总"
+    ws.append(["指标", "数值"])
+    ws.append(["总营收", 500])
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = client.post(
+        "/upload",
+        data={"files": (buffer, "经营数据.xlsx")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/dashboard")
+
+
+def test_upload_stays_on_upload_page_when_nothing_is_saved(client):
+    client.post("/login", data={"password": "test-pass"})
+
+    response = client.post(
+        "/upload",
+        data={"files": (io.BytesIO(b"data"), "malware.exe")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/upload")
+
+
+def test_dashboard_shows_flash_message_after_successful_upload(client, tmp_path):
+    client.post("/login", data={"password": "test-pass"})
+    (tmp_path / "config.yaml").write_text("kpis: []\ncharts: []\ntables: []\n", encoding="utf-8")
+
+    client.post(
+        "/upload",
+        data={"files": (io.BytesIO(b"data"), "经营数据.xlsx")},
+        content_type="multipart/form-data",
+    )
+
+    response = client.get("/dashboard")
+    html = response.data.decode("utf-8")
+    assert "已成功保存并解析" in html
+    assert "flash-success" in html
+
+
 def test_upload_rejects_path_traversal_filename(client, tmp_path):
     client.post("/login", data={"password": "test-pass"})
 

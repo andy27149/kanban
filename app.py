@@ -106,6 +106,8 @@ def create_app(test_config=None):
                     "error",
                 )
 
+            if saved:
+                return redirect(url_for("dashboard"))
             return redirect(url_for("upload"))
 
         return render_template("upload.html")

@@ -27,6 +27,39 @@ html, body {
   max-width: 100%;
 }
 
+.flash-stack {
+  padding: 14px 28px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flash-banner {
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.flash-success {
+  color: var(--gold-deep);
+  background: rgba(156, 122, 37, 0.08);
+  border-color: rgba(156, 122, 37, 0.25);
+}
+
+.flash-warning {
+  color: var(--gold-deep);
+  background: rgba(201, 169, 78, 0.15);
+  border-color: var(--gold-border);
+}
+
+.flash-error {
+  color: var(--error);
+  background: var(--error-soft);
+  border-color: rgba(161, 63, 46, 0.2);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
